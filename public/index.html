@@ -1,0 +1,4791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>全身智能穿戴监测系统设计方案</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050811;
+      --panel: rgba(8, 23, 36, 0.76);
+      --panel-strong: rgba(8, 29, 45, 0.92);
+      --cyan: #45e8ff;
+      --cyan-soft: rgba(69, 232, 255, 0.2);
+      --orange: #ff9f35;
+      --orange-soft: rgba(255, 159, 53, 0.2);
+      --violet: #b75cff;
+      --green: #82ffb0;
+      --text: #effcff;
+      --muted: #9dc6d1;
+      --line: rgba(85, 230, 255, 0.52);
+      --card-radius: 8px;
+      --shadow-cyan: 0 0 28px rgba(69, 232, 255, 0.22);
+      --shadow-orange: 0 0 24px rgba(255, 159, 53, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", Arial, sans-serif;
+      background:
+        radial-gradient(circle at 50% 8%, rgba(69, 232, 255, 0.26), transparent 28rem),
+        radial-gradient(circle at 82% 34%, rgba(183, 92, 255, 0.18), transparent 30rem),
+        radial-gradient(circle at 18% 70%, rgba(255, 159, 53, 0.12), transparent 26rem),
+        linear-gradient(180deg, #07101c 0%, #050811 50%, #03050a 100%);
+      letter-spacing: 0;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(69, 232, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(69, 232, 255, 0.035) 1px, transparent 1px);
+      background-size: 38px 38px;
+      mask-image: linear-gradient(to bottom, black, transparent 82%);
+    }
+
+    .page {
+      width: min(1480px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 56px;
+    }
+
+    .hero-shell {
+      position: relative;
+      overflow: auto;
+      min-height: 860px;
+      border: 1px solid rgba(92, 231, 255, 0.42);
+      border-radius: var(--card-radius);
+      background:
+        radial-gradient(circle at 50% 26%, rgba(54, 210, 255, 0.22), transparent 20rem),
+        linear-gradient(180deg, rgba(9, 18, 31, 0.92), rgba(5, 8, 17, 0.96));
+      box-shadow: inset 0 0 90px rgba(69, 232, 255, 0.08), 0 24px 80px rgba(0, 0, 0, 0.45);
+    }
+
+    .hero-bg {
+      position: absolute;
+      left: -18%;
+      top: 0;
+      width: 118%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      opacity: 0.96;
+      z-index: 0;
+    }
+
+    .hero-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background:
+        linear-gradient(90deg, rgba(3, 6, 12, 0.72) 0%, rgba(3, 6, 12, 0.26) 28%, rgba(3, 6, 12, 0.16) 50%, rgba(3, 6, 12, 0.26) 72%, rgba(3, 6, 12, 0.72) 100%),
+        linear-gradient(180deg, rgba(3, 6, 12, 0.66) 0%, rgba(3, 6, 12, 0.12) 32%, rgba(3, 6, 12, 0.46) 100%);
+    }
+
+    .hero-shell::before {
+      content: "";
+      position: absolute;
+      left: 6%;
+      right: 6%;
+      bottom: -34px;
+      height: 300px;
+      background:
+        linear-gradient(transparent 0 28%, rgba(69, 232, 255, 0.18) 29% 30%, transparent 31%),
+        linear-gradient(90deg, transparent 0 18%, rgba(69, 232, 255, 0.16) 19% 20%, transparent 21%);
+      background-size: 100% 42px, 62px 100%;
+      transform: perspective(520px) rotateX(62deg);
+      transform-origin: bottom;
+      opacity: 0.72;
+      z-index: 1;
+    }
+
+    .title-band {
+      position: relative;
+      z-index: 6;
+      text-align: center;
+      padding: 28px 24px 10px;
+    }
+
+    .title-frame {
+      display: inline-block;
+      padding: 12px 52px 14px;
+      border: 1px solid rgba(94, 233, 255, 0.62);
+      background: rgba(8, 28, 45, 0.84);
+      clip-path: polygon(36px 0, calc(100% - 36px) 0, 100% 50%, calc(100% - 36px) 100%, 36px 100%, 0 50%);
+      box-shadow: var(--shadow-cyan);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 4vw, 56px);
+      line-height: 1.12;
+      font-weight: 900;
+      color: #e8fbff;
+      text-shadow: 0 0 20px rgba(69, 232, 255, 0.62);
+    }
+
+    .loadout {
+      position: relative;
+      z-index: 4;
+      display: grid;
+      grid-template-columns: minmax(250px, 310px) minmax(330px, 1fr) minmax(250px, 310px) minmax(220px, 280px);
+      gap: 20px;
+      align-items: center;
+      padding: 8px 28px 26px;
+    }
+
+    .tool-button,
+    .editor-panel button,
+    .editor-panel select,
+    .editor-panel input {
+      border: 1px solid rgba(69, 232, 255, 0.46);
+      border-radius: 6px;
+      color: var(--text);
+      background: rgba(5, 18, 30, 0.84);
+      font: inherit;
+    }
+
+    .tool-button,
+    .editor-panel button {
+      min-height: 36px;
+      padding: 8px 12px;
+      cursor: pointer;
+      box-shadow: inset 0 0 16px rgba(69, 232, 255, 0.08);
+    }
+
+    .tool-button:hover,
+    .editor-panel button:hover {
+      border-color: var(--orange);
+      color: #fff6d9;
+    }
+
+    .tool-button.active {
+      border-color: var(--orange);
+      background: rgba(255, 159, 53, 0.16);
+    }
+
+    .action-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.52);
+      backdrop-filter: blur(6px);
+    }
+
+    .action-dialog[hidden] {
+      display: none;
+    }
+
+    .dialog-card {
+      width: min(420px, 100%);
+      max-height: calc(100vh - 40px);
+      padding: 18px;
+      border: 1px solid rgba(69, 232, 255, 0.42);
+      border-radius: var(--card-radius);
+      background: rgba(4, 14, 25, 0.96);
+      box-shadow: var(--shadow-cyan), 0 22px 70px rgba(0, 0, 0, 0.45);
+      overflow: auto;
+    }
+
+    .equipment-detail-card {
+      width: min(760px, 100%);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .equipment-detail-body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding-right: 4px;
+    }
+
+    .dialog-card h3 {
+      margin-bottom: 10px;
+    }
+
+    .dialog-copy {
+      margin: 0 0 12px;
+      color: #c7e5ec;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .dialog-field {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .dialog-field label {
+      color: #9befff;
+      font-size: 12px;
+    }
+
+    .dialog-field input,
+    .dialog-field select,
+    .dialog-field textarea {
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid rgba(69, 232, 255, 0.46);
+      border-radius: 6px;
+      color: var(--text);
+      background: rgba(5, 18, 30, 0.84);
+      font: inherit;
+    }
+
+    .dialog-field textarea {
+      min-height: 82px;
+      resize: vertical;
+      line-height: 1.55;
+    }
+
+    .url-fetch-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+      gap: 8px;
+    }
+
+    .fetch-equipment-button {
+      min-height: 36px;
+      padding: 7px 12px;
+      border: 1px solid rgba(255, 159, 53, 0.58);
+      border-radius: 6px;
+      color: #fff6d9;
+      background: rgba(255, 159, 53, 0.12);
+      font: inherit;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    .fetch-equipment-button:hover {
+      border-color: rgba(255, 159, 53, 0.84);
+      background: rgba(255, 159, 53, 0.2);
+    }
+
+    .fetch-status {
+      min-height: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .dialog-actions button {
+      min-height: 36px;
+      padding: 8px 12px;
+      border: 1px solid rgba(69, 232, 255, 0.46);
+      border-radius: 6px;
+      color: var(--text);
+      background: rgba(5, 18, 30, 0.84);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .dialog-actions .danger {
+      margin-right: auto;
+      border-color: rgba(255, 95, 95, 0.62);
+      color: #ffd7d7;
+      background: rgba(255, 95, 95, 0.12);
+    }
+
+    .card-stack {
+      grid-column: 1;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+
+    .card-stack + .body-stage + .card-stack {
+      grid-column: 3;
+      grid-row: 1;
+    }
+
+    #customDeviceStack {
+      display: none;
+    }
+
+    .card-stack.drag-over {
+      outline: 1px dashed rgba(69, 232, 255, 0.42);
+      outline-offset: 8px;
+    }
+
+    .device-card {
+      position: relative;
+      min-height: 86px;
+      display: grid;
+      grid-template-columns: 52px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 11px;
+      border: 1px solid rgba(255, 159, 53, 0.48);
+      border-radius: 999px;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(69, 232, 255, 0.16), transparent 42px),
+        linear-gradient(135deg, rgba(8, 31, 50, 0.86), rgba(6, 13, 22, 0.76)),
+        var(--panel);
+      box-shadow: inset 0 0 0 1px rgba(69, 232, 255, 0.22), 0 0 18px rgba(69, 232, 255, 0.08);
+    }
+
+    .device-card[draggable="true"] {
+      cursor: grab;
+    }
+
+    .device-card.dragging {
+      opacity: 0.52;
+      cursor: grabbing;
+    }
+
+    .device-card::before,
+    .device-card::after {
+      display: none;
+    }
+
+    .device-card::before {
+      top: -2px;
+      right: 24px;
+    }
+
+    .device-card::after {
+      bottom: -2px;
+      left: 24px;
+    }
+
+    .icon-box {
+      width: 52px;
+      height: 52px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(96, 235, 255, 0.82);
+      border-radius: 50%;
+      color: var(--cyan);
+      background: rgba(4, 16, 28, 0.86);
+      box-shadow: inset 0 0 18px rgba(69, 232, 255, 0.16);
+    }
+
+    .icon-box svg {
+      width: 29px;
+      height: 29px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .icon-box img {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+    }
+
+    .device-title {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+      color: #fff6d9;
+      font-weight: 850;
+    }
+
+    .device-subtitle {
+      margin-top: 2px;
+      color: #ffba67;
+      font-size: 11px;
+    }
+
+    .device-model {
+      margin-top: 2px;
+      color: #9befff;
+      font-size: 11px;
+      line-height: 1.2;
+    }
+
+    .device-model:empty {
+      display: none;
+    }
+
+    .device-metrics {
+      display: none;
+    }
+
+    .tags {
+      display: none;
+    }
+
+    .tag {
+      padding: 4px 7px;
+      border: 1px solid rgba(69, 232, 255, 0.5);
+      border-radius: 4px;
+      color: #b8f5ff;
+      background: rgba(69, 232, 255, 0.08);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .body-stage {
+      grid-column: 2;
+      grid-row: 1;
+      position: relative;
+      min-height: 650px;
+      display: grid;
+      place-items: center;
+    }
+
+    .equipment-panel {
+      grid-column: 4;
+      grid-row: 1;
+      align-self: stretch;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 12px;
+      min-height: 620px;
+      padding: 14px;
+      border: 1px solid rgba(69, 232, 255, 0.34);
+      border-radius: var(--card-radius);
+      background:
+        linear-gradient(180deg, rgba(234, 239, 232, 0.16), rgba(7, 13, 24, 0.82)),
+        rgba(7, 18, 31, 0.82);
+      box-shadow: inset 0 0 34px rgba(69, 232, 255, 0.08), var(--shadow-cyan);
+    }
+
+    .equipment-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(69, 232, 255, 0.2);
+      color: #eafcff;
+      font-weight: 850;
+    }
+
+    .equipment-title span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .equipment-page-button {
+      min-height: 30px;
+      padding: 6px 10px;
+      border: 1px solid rgba(255, 159, 53, 0.52);
+      border-radius: 999px;
+      color: #fff6d9;
+      background: rgba(255, 159, 53, 0.12);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .equipment-page-button:hover {
+      border-color: var(--cyan);
+      color: #eafcff;
+    }
+
+    .equipment-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-content: start;
+      gap: 10px;
+    }
+
+    .equipment-slot {
+      position: relative;
+      aspect-ratio: 1;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(230, 236, 231, 0.44);
+      border-radius: 8px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.04)),
+        rgba(150, 156, 151, 0.22);
+      box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.08);
+    }
+
+    .equipment-slot.filled {
+      border-color: rgba(255, 159, 53, 0.72);
+      background:
+        radial-gradient(circle at 50% 38%, rgba(69, 232, 255, 0.28), transparent 38px),
+        linear-gradient(145deg, rgba(25, 45, 62, 0.88), rgba(8, 15, 27, 0.88));
+    }
+
+    .equipment-slot .slot-icon {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--cyan);
+    }
+
+    .equipment-slot .slot-icon svg {
+      width: 32px;
+      height: 32px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .equipment-slot .slot-icon img,
+    .library-icon img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: inherit;
+      object-fit: cover;
+    }
+
+    .equipment-slot .slot-name {
+      position: absolute;
+      left: 5px;
+      right: 5px;
+      bottom: 5px;
+      overflow: hidden;
+      color: #fff6d9;
+      font-size: 10px;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .equipment-slot.has-model .slot-name {
+      bottom: 17px;
+    }
+
+    .equipment-slot .slot-model {
+      position: absolute;
+      left: 5px;
+      right: 5px;
+      bottom: 5px;
+      overflow: hidden;
+      color: #9befff;
+      font-size: 9px;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .equipment-page {
+      position: fixed;
+      inset: 0;
+      z-index: 28;
+      padding: 28px;
+      overflow: auto;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(69, 232, 255, 0.16), transparent 24rem),
+        radial-gradient(circle at 86% 18%, rgba(255, 159, 53, 0.12), transparent 22rem),
+        rgba(2, 6, 12, 0.94);
+      backdrop-filter: blur(8px);
+    }
+
+    .equipment-page[hidden] {
+      display: none;
+    }
+
+    .equipment-page-shell {
+      position: relative;
+      width: min(1180px, 100%);
+      margin: 0 auto;
+      border: 1px solid rgba(69, 232, 255, 0.36);
+      border-radius: var(--card-radius);
+      background: rgba(4, 14, 25, 0.92);
+      box-shadow: var(--shadow-cyan), 0 24px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .equipment-page-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 20px;
+      border-bottom: 1px solid rgba(69, 232, 255, 0.18);
+    }
+
+    .equipment-page-head h2 {
+      margin: 0;
+      font-size: 26px;
+    }
+
+    .equipment-page-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .equipment-view-button,
+    .equipment-close-button {
+      min-height: 36px;
+      padding: 8px 12px;
+      border: 1px solid rgba(69, 232, 255, 0.42);
+      border-radius: 6px;
+      color: var(--text);
+      background: rgba(5, 18, 30, 0.84);
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .equipment-view-button.active {
+      border-color: var(--orange);
+      color: #fff6d9;
+      background: rgba(255, 159, 53, 0.14);
+    }
+
+    .equipment-page-body {
+      padding: 18px 20px 92px;
+    }
+
+    .add-equipment-fab {
+      position: absolute;
+      left: 20px;
+      bottom: 20px;
+      z-index: 31;
+      width: 58px;
+      height: 58px;
+      border: 1px solid rgba(255, 159, 53, 0.72);
+      border-radius: 50%;
+      color: #07101b;
+      background: linear-gradient(135deg, #ffe0a3, var(--orange));
+      box-shadow: 0 0 24px rgba(255, 159, 53, 0.36), 0 12px 34px rgba(0, 0, 0, 0.38);
+      font-size: 34px;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .add-equipment-fab:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .equipment-table-wrap {
+      overflow: auto;
+    }
+
+    .equipment-table-row {
+      cursor: pointer;
+      transition: background 0.16s ease;
+    }
+
+    .equipment-table-row:hover {
+      background: rgba(69, 232, 255, 0.07);
+    }
+
+    .delete-equipment-button,
+    .thumbnail-button {
+      border: 0;
+      background: transparent;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    .delete-equipment-button {
+      width: 30px;
+      height: 30px;
+      border: 1px solid rgba(255, 95, 95, 0.58);
+      border-radius: 50%;
+      color: #ffd7d7;
+      background: rgba(255, 95, 95, 0.12);
+      font-size: 22px;
+      line-height: 1;
+    }
+
+    .delete-equipment-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.38;
+      filter: grayscale(0.4);
+    }
+
+    .delete-equipment-button:hover {
+      border-color: rgba(255, 95, 95, 0.86);
+      background: rgba(255, 95, 95, 0.22);
+    }
+
+    .delete-equipment-button:disabled:hover {
+      border-color: rgba(255, 95, 95, 0.58);
+      background: rgba(255, 95, 95, 0.12);
+    }
+
+    .thumbnail-button {
+      padding: 0;
+      color: inherit;
+    }
+
+    .thumbnail-button:hover .library-icon {
+      border-color: rgba(255, 159, 53, 0.76);
+      color: #fff6d9;
+    }
+
+    .equipment-library-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .equipment-library-card {
+      padding: 16px;
+      border: 1px solid rgba(69, 232, 255, 0.28);
+      border-radius: var(--card-radius);
+      background:
+        radial-gradient(circle at 18% 16%, rgba(69, 232, 255, 0.14), transparent 56px),
+        rgba(8, 23, 36, 0.78);
+    }
+
+    .equipment-library-card:not(.add-equipment-card) {
+      cursor: pointer;
+    }
+
+    .equipment-library-card:not(.add-equipment-card):hover {
+      border-color: rgba(255, 159, 53, 0.56);
+      background:
+        radial-gradient(circle at 18% 16%, rgba(255, 159, 53, 0.12), transparent 62px),
+        rgba(8, 23, 36, 0.86);
+    }
+
+    .equipment-library-card .card-top {
+      display: grid;
+      grid-template-columns: 54px 1fr;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .equipment-library-card .library-icon {
+      width: 54px;
+      height: 54px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(96, 235, 255, 0.66);
+      border-radius: 50%;
+      color: var(--cyan);
+      background: rgba(4, 16, 28, 0.86);
+    }
+
+    .equipment-library-card .library-icon svg {
+      width: 30px;
+      height: 30px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .equipment-table-wrap .library-icon {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(96, 235, 255, 0.5);
+      border-radius: 50%;
+      color: var(--cyan);
+      background: rgba(4, 16, 28, 0.72);
+    }
+
+    .equipment-table-wrap .library-icon svg {
+      width: 25px;
+      height: 25px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .equipment-library-card h3 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .equipment-library-card .english {
+      margin-top: 2px;
+      color: #ffba67;
+      font-size: 12px;
+    }
+
+    .equipment-library-card .model {
+      margin-top: 4px;
+      color: #9befff;
+      font-size: 12px;
+    }
+
+    .equipment-library-card p {
+      margin: 0;
+      color: #c7e5ec;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .equipment-library-card .library-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .add-equipment-card {
+      min-height: 196px;
+      display: grid;
+      place-items: center;
+      align-content: center;
+      gap: 12px;
+      border-style: dashed;
+      color: #b9dbe3;
+      font: inherit;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .add-equipment-card:hover {
+      border-color: rgba(255, 159, 53, 0.72);
+      color: #fff6d9;
+      background:
+        radial-gradient(circle at 50% 44%, rgba(255, 159, 53, 0.16), transparent 72px),
+        rgba(8, 23, 36, 0.86);
+    }
+
+    .add-card-plus {
+      width: 58px;
+      height: 58px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 159, 53, 0.72);
+      border-radius: 50%;
+      color: #07101b;
+      background: linear-gradient(135deg, #ffe0a3, var(--orange));
+      box-shadow: 0 0 22px rgba(255, 159, 53, 0.3);
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    .equipment-preview-visual {
+      min-height: 260px;
+      display: grid;
+      place-items: center;
+      margin: 16px 0;
+      border: 1px solid rgba(69, 232, 255, 0.28);
+      border-radius: var(--card-radius);
+      background:
+        radial-gradient(circle at 50% 50%, rgba(69, 232, 255, 0.18), transparent 130px),
+        rgba(5, 18, 30, 0.88);
+    }
+
+    .equipment-preview-visual svg {
+      width: min(220px, 68vw);
+      height: min(220px, 68vw);
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .equipment-preview-visual img {
+      width: min(320px, 76vw);
+      max-height: 320px;
+      object-fit: contain;
+      border-radius: var(--card-radius);
+    }
+
+    .equipment-detail-grid {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 12px 14px;
+      margin-top: 14px;
+    }
+
+    .equipment-detail-grid dt {
+      color: #9befff;
+      font-size: 12px;
+    }
+
+    .equipment-detail-grid dd {
+      margin: 0;
+      color: #d8f3f8;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .spec-list {
+      display: grid;
+      gap: 8px;
+      margin: 8px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .spec-list li {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid rgba(69, 232, 255, 0.18);
+      border-radius: 6px;
+      background: rgba(69, 232, 255, 0.06);
+    }
+
+    .spec-key {
+      color: #9befff;
+      font-size: 12px;
+    }
+
+    .spec-value {
+      color: #d8f3f8;
+      word-break: break-word;
+    }
+
+    .body-stage .anchor,
+    .body-stage .connectors {
+      display: none;
+    }
+
+    .aura {
+      position: absolute;
+      width: 410px;
+      height: 610px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(69, 232, 255, 0.18), transparent 64%);
+      filter: blur(3px);
+      display: none;
+    }
+
+    .platform {
+      position: absolute;
+      bottom: 16px;
+      width: 320px;
+      height: 56px;
+      border: 1px solid rgba(94, 233, 255, 0.6);
+      border-radius: 50%;
+      box-shadow: 0 0 42px rgba(69, 232, 255, 0.32), inset 0 0 22px rgba(255, 159, 53, 0.15);
+      display: none;
+    }
+
+    .human-svg {
+      position: relative;
+      z-index: 2;
+      width: min(380px, 100%);
+      height: auto;
+      filter: drop-shadow(0 0 34px rgba(69, 232, 255, 0.34));
+      display: none;
+    }
+
+    .anchor {
+      position: absolute;
+      z-index: 3;
+      width: 12px;
+      height: 12px;
+      border: 1px solid rgba(255, 190, 108, 0.7);
+      border-radius: 50%;
+      background: rgba(255, 221, 142, 0.58);
+      box-shadow: 0 0 7px rgba(255, 159, 53, 0.36), 0 0 10px rgba(69, 232, 255, 0.18);
+    }
+
+    .anchor-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      pointer-events: none;
+    }
+
+    .anchor-layer .anchor {
+      z-index: 6;
+      transform: translate(-50%, -50%);
+      cursor: grab;
+      pointer-events: auto;
+    }
+
+    .anchor-layer .anchor:active {
+      cursor: grabbing;
+    }
+
+    .anchor-layer .anchor.selected {
+      border-color: rgba(191, 255, 217, 0.9);
+      background: rgba(130, 255, 176, 0.72);
+      box-shadow: 0 0 9px rgba(130, 255, 176, 0.5), 0 0 14px rgba(69, 232, 255, 0.26);
+    }
+
+    .anchor::after {
+      display: none;
+    }
+
+    .head { left: 50%; top: 78px; transform: translateX(-50%); }
+    .eye { left: 55%; top: 112px; }
+    .ear { left: 34%; top: 116px; }
+    .chest { left: 50%; top: 224px; transform: translateX(-50%); }
+    .wrist { left: 28%; top: 354px; }
+    .finger { right: 26%; top: 385px; }
+    .waist { left: 50%; top: 318px; transform: translateX(-50%); }
+    .knee { right: 36%; top: 485px; }
+    .foot { right: 34%; bottom: 78px; }
+
+    .hero-shell > .anchor {
+      z-index: 5;
+      transform: translate(-50%, -50%);
+    }
+
+    .hero-shell > .anchor::after {
+      left: 22px;
+      top: -6px;
+    }
+
+    .hero-shell > .head { left: 50.2%; top: 19.6%; }
+    .hero-shell > .eye { left: 50.3%; top: 22.0%; }
+    .hero-shell > .ear { left: 47.4%; top: 23.4%; }
+    .hero-shell > .chest { left: 50.2%; top: 36.3%; }
+    .hero-shell > .wrist { left: 42.0%; top: 54.3%; }
+    .hero-shell > .finger { left: 58.0%; top: 58.5%; }
+    .hero-shell > .waist { left: 50.3%; top: 48.8%; }
+    .hero-shell > .knee { left: 54.4%; top: 73.3%; }
+    .hero-shell > .foot { left: 55.8%; top: 91.6%; }
+
+    .hero-connectors {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .hero-connectors path {
+      fill: none;
+      stroke: rgba(255, 159, 53, 0.84);
+      stroke-width: 0.16;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 4px rgba(255, 159, 53, 0.72));
+    }
+
+    .hero-connectors circle {
+      fill: #fff0a3;
+      stroke: var(--orange);
+      stroke-width: 0.18;
+      vector-effect: non-scaling-stroke;
+      filter: drop-shadow(0 0 5px rgba(255, 159, 53, 0.9));
+    }
+
+    .hero-connectors .dynamic-line {
+      stroke: rgba(154, 234, 245, 0.48);
+      stroke-width: 1.4;
+      stroke-dasharray: 8 8;
+      vector-effect: non-scaling-stroke;
+      opacity: 0.86;
+      filter: drop-shadow(0 0 3px rgba(69, 232, 255, 0.28));
+    }
+
+    .device-card.linked {
+      border-color: #ffd27c;
+      box-shadow: inset 0 0 0 1px rgba(69, 232, 255, 0.44), 0 0 28px rgba(255, 159, 53, 0.34);
+    }
+
+    .editor-panel {
+      position: absolute;
+      right: 28px;
+      bottom: 134px;
+      z-index: 8;
+      width: min(340px, calc(100% - 56px));
+      padding: 14px;
+      border: 1px solid rgba(69, 232, 255, 0.42);
+      border-radius: var(--card-radius);
+      background: rgba(4, 14, 25, 0.9);
+      box-shadow: var(--shadow-cyan);
+      display: none;
+    }
+
+    .editor-panel.visible {
+      display: block;
+    }
+
+    .editor-panel h3 {
+      margin-bottom: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      color: #9befff;
+      font-size: 12px;
+    }
+
+    .editor-panel input,
+    .editor-panel select {
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 9px;
+    }
+
+    .editor-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+      margin-top: 12px;
+    }
+
+    .danger {
+      border-color: rgba(255, 104, 104, 0.7) !important;
+      color: #ffd0d0 !important;
+    }
+
+    .connectors {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .connectors path {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 2;
+      filter: drop-shadow(0 0 5px rgba(69, 232, 255, 0.8));
+    }
+
+    .summary-strip {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .summary-item {
+      min-height: 96px;
+      padding: 14px;
+      border: 1px solid rgba(69, 232, 255, 0.48);
+      border-radius: var(--card-radius);
+      background: rgba(4, 18, 31, 0.74);
+      box-shadow: inset 0 0 22px rgba(69, 232, 255, 0.07);
+    }
+
+    .summary-label {
+      color: var(--cyan);
+      font-size: 13px;
+    }
+
+    .summary-value {
+      margin-top: 6px;
+      font-size: 24px;
+      line-height: 1.2;
+      color: #fff;
+      font-weight: 850;
+    }
+
+    .summary-note {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .share-section {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      align-items: stretch;
+      background:
+        radial-gradient(circle at 18% 20%, rgba(69, 232, 255, 0.12), transparent 20rem),
+        radial-gradient(circle at 92% 20%, rgba(255, 159, 53, 0.12), transparent 18rem),
+        rgba(4, 13, 24, 0.82);
+    }
+
+    .share-copy {
+      display: flex;
+      justify-content: flex-start;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .share-copy-main {
+      display: grid;
+      gap: 10px;
+    }
+
+    .share-title {
+      margin: 0;
+      font-size: clamp(28px, 3.2vw, 44px);
+      line-height: 1.12;
+    }
+
+    .share-line {
+      max-width: 620px;
+      margin: 0;
+      color: #c7e5ec;
+    }
+
+    .share-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px 10px;
+      margin-top: -4px;
+    }
+
+    .equipment-info-section {
+      display: grid;
+      gap: 14px;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(69, 232, 255, 0.11), transparent 18rem),
+        rgba(4, 13, 24, 0.82);
+    }
+
+    .equipment-info-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .equipment-info-head h2 {
+      margin: 0;
+      font-size: clamp(28px, 3.2vw, 44px);
+      line-height: 1.12;
+    }
+
+    .equipment-info-count {
+      color: #9befff;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .equipment-info-table-wrap {
+      overflow-x: auto;
+      border: 1px solid rgba(69, 232, 255, 0.24);
+      border-radius: var(--card-radius);
+      background: rgba(4, 13, 24, 0.54);
+    }
+
+    .equipment-info-table {
+      width: 100%;
+      min-width: 920px;
+      border-collapse: collapse;
+    }
+
+    .equipment-info-table th,
+    .equipment-info-table td {
+      padding: 11px 12px;
+      border-bottom: 1px solid rgba(69, 232, 255, 0.12);
+      text-align: left;
+      vertical-align: middle;
+      font-size: 13px;
+    }
+
+    .equipment-info-table th {
+      color: #9befff;
+      font-size: 12px;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .equipment-info-table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .equipment-info-thumb {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid rgba(96, 235, 255, 0.5);
+      border-radius: 50%;
+      color: var(--cyan);
+      background: rgba(4, 16, 28, 0.72);
+    }
+
+    .equipment-info-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .equipment-info-thumb svg {
+      width: 30px;
+      height: 30px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .equipment-info-url {
+      max-width: 240px;
+      display: inline-block;
+      color: #ffcf91;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: bottom;
+      white-space: nowrap;
+    }
+
+    .equipment-info-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 9px;
+      border: 1px solid rgba(69, 232, 255, 0.34);
+      border-radius: 999px;
+      color: #d8f3f8;
+      background: rgba(69, 232, 255, 0.08);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .equipment-info-status.pending {
+      border-color: rgba(255, 159, 53, 0.44);
+      color: #ffe2ba;
+      background: rgba(255, 159, 53, 0.1);
+    }
+
+    .equipment-info-empty {
+      padding: 18px;
+      color: #c7e5ec;
+      border: 1px dashed rgba(69, 232, 255, 0.24);
+      border-radius: var(--card-radius);
+      background: rgba(4, 13, 24, 0.48);
+    }
+
+    .equipment-info-add {
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 159, 53, 0.7);
+      border-radius: 50%;
+      color: #07101b;
+      background: linear-gradient(135deg, #ffe0a3, var(--orange));
+      box-shadow: 0 0 20px rgba(255, 159, 53, 0.28);
+      font: inherit;
+      font-size: 28px;
+      font-weight: 850;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .equipment-info-add:hover {
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .equipment-picker-card {
+      width: min(760px, calc(100vw - 28px));
+    }
+
+    .equipment-picker-list {
+      display: grid;
+      gap: 10px;
+      max-height: min(58vh, 520px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .equipment-picker-option {
+      display: grid;
+      grid-template-columns: auto 42px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px;
+      border: 1px solid rgba(69, 232, 255, 0.22);
+      border-radius: var(--card-radius);
+      background: rgba(4, 13, 24, 0.55);
+      cursor: pointer;
+    }
+
+    .equipment-picker-option:hover {
+      border-color: rgba(255, 159, 53, 0.48);
+    }
+
+    .equipment-picker-option input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--orange);
+    }
+
+    .equipment-picker-option-thumb {
+      width: 42px;
+      height: 42px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      border: 1px solid rgba(96, 235, 255, 0.5);
+      border-radius: 50%;
+      color: var(--cyan);
+      background: rgba(4, 16, 28, 0.72);
+    }
+
+    .equipment-picker-option-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .equipment-picker-option-thumb svg {
+      width: 28px;
+      height: 28px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .equipment-picker-option-title {
+      color: #fff6d9;
+      font-weight: 850;
+    }
+
+    .equipment-picker-option-meta {
+      margin-top: 3px;
+      color: #c7e5ec;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .save-scheme-button {
+      width: fit-content;
+      min-height: 38px;
+      padding: 8px 16px;
+      border: 1px solid rgba(255, 159, 53, 0.68);
+      border-radius: 999px;
+      color: #fff6d9;
+      background: rgba(255, 159, 53, 0.14);
+      box-shadow: 0 0 16px rgba(255, 159, 53, 0.14);
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .save-scheme-button:hover {
+      border-color: var(--cyan);
+      color: #eafcff;
+      background: rgba(69, 232, 255, 0.12);
+    }
+
+    .save-scheme-status {
+      min-height: 18px;
+      color: #bfffd9;
+      font-size: 12px;
+    }
+
+    .share-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .share-button {
+      min-height: 34px;
+      padding: 7px 13px;
+      border: 1px solid rgba(255, 159, 53, 0.42);
+      border-radius: 999px;
+      color: #ffe2ba;
+      background: rgba(255, 159, 53, 0.08);
+      font: inherit;
+      font-size: 14px;
+      font-weight: 750;
+      cursor: pointer;
+    }
+
+    .share-button.secondary {
+      border-color: rgba(69, 232, 255, 0.44);
+      color: #d8f3f8;
+      background: rgba(69, 232, 255, 0.08);
+    }
+
+    .share-button:hover {
+      border-color: rgba(69, 232, 255, 0.76);
+      color: #eafcff;
+    }
+
+    .share-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .share-metric {
+      min-height: 148px;
+      display: grid;
+      align-content: space-between;
+      padding: 18px;
+      border: 1px solid rgba(69, 232, 255, 0.38);
+      border-radius: var(--card-radius);
+      background:
+        linear-gradient(135deg, rgba(8, 31, 50, 0.92), rgba(6, 13, 22, 0.82));
+      box-shadow: inset 0 0 0 1px rgba(69, 232, 255, 0.18), var(--shadow-cyan);
+    }
+
+    .share-metric-label {
+      color: var(--cyan);
+      font-size: 14px;
+    }
+
+    .share-metric-value {
+      margin-top: 8px;
+      font-size: clamp(30px, 3vw, 44px);
+      line-height: 1;
+      color: #fff;
+      font-weight: 900;
+      text-shadow: 0 0 18px rgba(69, 232, 255, 0.4);
+    }
+
+    .share-metric-value.money {
+      color: #fff6d9;
+      font-size: clamp(27px, 2.6vw, 38px);
+    }
+
+    .share-metric-value.grade {
+      color: #bfffd9;
+    }
+
+    .share-metric-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .share-radar-card {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+      gap: 16px 20px;
+      align-items: center;
+      padding: 18px;
+      border: 1px solid rgba(69, 232, 255, 0.38);
+      border-radius: var(--card-radius);
+      background:
+        radial-gradient(circle at 50% 38%, rgba(69, 232, 255, 0.12), transparent 120px),
+        linear-gradient(135deg, rgba(8, 31, 50, 0.92), rgba(6, 13, 22, 0.82));
+      box-shadow: inset 0 0 0 1px rgba(69, 232, 255, 0.18), var(--shadow-cyan);
+    }
+
+    .share-radar-head {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 8px;
+      color: var(--cyan);
+      font-size: 14px;
+    }
+
+    .share-radar-score {
+      color: #fff6d9;
+      font-weight: 850;
+    }
+
+    .share-radar {
+      width: 100%;
+      max-width: 320px;
+      margin: 0 auto;
+      display: block;
+    }
+
+    .share-radar .grid {
+      fill: none;
+      stroke: rgba(154, 234, 245, 0.22);
+      stroke-width: 1;
+    }
+
+    .share-radar .axis {
+      stroke: rgba(154, 234, 245, 0.22);
+      stroke-width: 1;
+    }
+
+    .share-radar .coverage {
+      fill: rgba(69, 232, 255, 0.26);
+      stroke: rgba(69, 232, 255, 0.9);
+      stroke-width: 2;
+    }
+
+    .share-radar .precision {
+      fill: rgba(255, 159, 53, 0.2);
+      stroke: rgba(255, 159, 53, 0.94);
+      stroke-width: 2;
+    }
+
+    .share-radar .dot {
+      fill: #fff6d9;
+      stroke-width: 1.5;
+    }
+
+    .share-radar text {
+      fill: #c7e5ec;
+      font-size: 11px;
+      text-anchor: middle;
+    }
+
+    .share-radar-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-start;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .share-radar-copy {
+      display: grid;
+      gap: 12px;
+      align-content: center;
+      color: #c7e5ec;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .share-radar-copy strong {
+      color: #fff6d9;
+    }
+
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      display: inline-block;
+      margin-right: 5px;
+      border-radius: 50%;
+      vertical-align: -1px;
+    }
+
+    .legend-dot.coverage {
+      background: var(--cyan);
+    }
+
+    .legend-dot.precision {
+      background: var(--orange);
+    }
+
+    .scheme-section {
+      margin-top: 16px;
+      background:
+        radial-gradient(circle at 10% 16%, rgba(255, 159, 53, 0.1), transparent 18rem),
+        rgba(4, 13, 24, 0.72);
+    }
+
+    .scheme-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 16px;
+    }
+
+    .scheme-section-head h2 {
+      margin: 0;
+    }
+
+    .scheme-count {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .scheme-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 420px));
+      gap: 16px;
+      justify-content: start;
+    }
+
+    .scheme-empty {
+      padding: 18px;
+      border: 1px dashed rgba(69, 232, 255, 0.34);
+      border-radius: var(--card-radius);
+      color: var(--muted);
+      background: rgba(5, 18, 30, 0.38);
+    }
+
+    .scheme-card {
+      position: relative;
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(69, 232, 255, 0.34);
+      border-radius: var(--card-radius);
+      background:
+        linear-gradient(135deg, rgba(8, 31, 50, 0.88), rgba(6, 13, 22, 0.78));
+      box-shadow: inset 0 0 0 1px rgba(69, 232, 255, 0.14);
+    }
+
+    .scheme-thumbnail-button {
+      width: 100%;
+      min-height: 190px;
+      padding: 0;
+      border: 1px solid rgba(255, 159, 53, 0.46);
+      border-radius: 8px;
+      overflow: hidden;
+      background: rgba(2, 8, 14, 0.92);
+      cursor: pointer;
+    }
+
+    .scheme-thumbnail-button:hover {
+      border-color: rgba(69, 232, 255, 0.72);
+      box-shadow: 0 0 24px rgba(69, 232, 255, 0.18);
+    }
+
+    .scheme-thumbnail {
+      width: 100%;
+      height: 100%;
+      min-height: 190px;
+      aspect-ratio: 16 / 9;
+      display: block;
+      object-fit: cover;
+    }
+
+    .scheme-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .scheme-action-button {
+      min-height: 30px;
+      padding: 6px 10px;
+      border: 1px solid rgba(69, 232, 255, 0.44);
+      border-radius: 999px;
+      color: #eafcff;
+      background: rgba(69, 232, 255, 0.08);
+      font: inherit;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .scheme-action-button.danger {
+      border-color: rgba(255, 95, 95, 0.56);
+      color: #ffd7d7;
+      background: rgba(255, 95, 95, 0.1);
+    }
+
+    .scheme-action-button.danger:hover {
+      border-color: rgba(255, 95, 95, 0.82);
+      background: rgba(255, 95, 95, 0.2);
+    }
+
+    .scheme-delete-popover {
+      position: absolute;
+      right: 14px;
+      bottom: 52px;
+      z-index: 4;
+      width: min(280px, calc(100% - 28px));
+      padding: 12px;
+      border: 1px solid rgba(255, 95, 95, 0.58);
+      border-radius: 8px;
+      color: #ffd7d7;
+      background: rgba(22, 7, 10, 0.96);
+      box-shadow: 0 18px 36px rgba(0, 0, 0, 0.34), 0 0 20px rgba(255, 95, 95, 0.16);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .scheme-delete-popover::after {
+      content: "";
+      position: absolute;
+      right: 28px;
+      bottom: -7px;
+      width: 12px;
+      height: 12px;
+      border-right: 1px solid rgba(255, 95, 95, 0.58);
+      border-bottom: 1px solid rgba(255, 95, 95, 0.58);
+      background: rgba(22, 7, 10, 0.96);
+      transform: rotate(45deg);
+    }
+
+    .scheme-delete-title {
+      color: #fff6d9;
+      font-weight: 850;
+    }
+
+    .scheme-delete-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .scheme-name-card {
+      width: min(420px, calc(100vw - 32px));
+    }
+
+    section {
+      margin-top: 22px;
+      padding: 28px;
+      border: 1px solid rgba(69, 232, 255, 0.24);
+      border-radius: var(--card-radius);
+      background: rgba(4, 13, 24, 0.78);
+      box-shadow: inset 0 0 42px rgba(69, 232, 255, 0.05);
+    }
+
+    h2 {
+      margin: 0 0 16px;
+      color: #eafcff;
+      font-size: 28px;
+      line-height: 1.25;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      color: #fff6d9;
+      font-size: 18px;
+    }
+
+    p {
+      color: #c7e5ec;
+      line-height: 1.72;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .info-card {
+      padding: 18px;
+      border: 1px solid rgba(69, 232, 255, 0.32);
+      border-radius: var(--card-radius);
+      background: rgba(9, 27, 42, 0.72);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: var(--card-radius);
+      border: 1px solid rgba(69, 232, 255, 0.28);
+    }
+
+    th,
+    td {
+      padding: 13px 14px;
+      border-bottom: 1px solid rgba(69, 232, 255, 0.18);
+      text-align: left;
+      vertical-align: top;
+      color: #d8f3f8;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    th {
+      color: #9bf3ff;
+      background: rgba(69, 232, 255, 0.09);
+      font-weight: 800;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 14px;
+      counter-reset: step;
+    }
+
+    .step {
+      position: relative;
+      padding: 16px 18px 16px 58px;
+      border: 1px solid rgba(255, 159, 53, 0.34);
+      border-radius: var(--card-radius);
+      background: rgba(28, 18, 8, 0.38);
+    }
+
+    .step::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      color: #07101b;
+      background: var(--orange);
+      font-weight: 900;
+    }
+
+    .mapping-note {
+      margin-top: 14px;
+      padding: 14px;
+      border-left: 3px solid var(--orange);
+      background: rgba(255, 159, 53, 0.08);
+      color: #ffe2ba;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 1120px) {
+      .hero-shell {
+        min-height: auto;
+      }
+
+      .loadout {
+        grid-template-columns: 1fr;
+      }
+
+      .card-stack {
+        grid-column: 1;
+        grid-row: auto;
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .body-stage {
+        grid-column: 1;
+        grid-row: auto;
+        order: -1;
+      }
+
+      .equipment-panel {
+        grid-column: 1;
+        grid-row: auto;
+        min-height: auto;
+      }
+
+      .equipment-grid {
+        grid-template-columns: repeat(6, 1fr);
+      }
+
+      .connectors {
+        display: none;
+      }
+
+      .summary-strip,
+      .share-section,
+      .grid-3 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .share-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .share-radar-card {
+        grid-template-columns: 1fr;
+      }
+
+      .share-radar-legend {
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .page {
+        width: min(100vw - 18px, 1480px);
+        padding-top: 9px;
+      }
+
+      .title-frame {
+        padding: 12px 22px;
+        clip-path: none;
+        border-radius: var(--card-radius);
+      }
+
+      .loadout,
+      section {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .card-stack,
+      .summary-strip,
+      .share-section,
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+
+      .share-copy {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .share-actions {
+        align-items: flex-end;
+        flex-direction: column;
+      }
+
+      .equipment-info-head {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .share-metrics {
+        grid-template-columns: 1fr;
+      }
+
+      .device-card {
+        grid-template-columns: 52px 1fr;
+      }
+
+      .equipment-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+
+      .equipment-slot .slot-name {
+        display: none;
+      }
+
+      .equipment-slot .slot-model {
+        display: none;
+      }
+
+      .url-fetch-row {
+        grid-template-columns: 1fr;
+      }
+
+      .icon-box {
+        width: 52px;
+        height: 52px;
+      }
+
+      .body-stage {
+        min-height: 560px;
+      }
+
+      .anchor::after {
+        display: none;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      h2 {
+        font-size: 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="hero-shell">
+      <img class="hero-bg" src="assets/cyber-body-base.png" alt="偏现实未来科技朋克人体主视觉" />
+      <svg id="connectionLayer" class="hero-connectors" aria-hidden="true"></svg>
+      <div id="anchorLayer" class="anchor-layer" aria-label="可编辑身体锚点层"></div>
+      <header class="title-band">
+        <div class="title-frame">
+          <h1>全身智能穿戴监测系统</h1>
+        </div>
+      </header>
+      <div class="loadout">
+        <div id="leftDeviceStack" class="card-stack" data-device-side="left">
+          <article class="device-card" data-device="headset">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><path d="M10 25c0-9 6-16 14-16s14 7 14 16"/><path d="M13 25h22v7c0 4-3 7-7 7h-8c-4 0-7-3-7-7z"/><path d="M18 24h12"/><path d="M24 10v-5"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">智能头显 / 神经头环</h3>
+              <div class="device-subtitle">Smart Headset / Neuro Headband</div>
+              <div class="device-metrics">头部：EEG、睡眠阶段、注意力、压力指数。</div>
+              <div class="tags"><span class="tag">睡眠分期 85-90%</span><span class="tag">覆盖 88%</span></div>
+            </div>
+          </article>
+
+          <article class="device-card" data-device="ar-lens">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><path d="M5 24s7-11 19-11 19 11 19 11-7 11-19 11S5 24 5 24z"/><circle cx="24" cy="24" r="6"/><path d="M24 17v-4M24 35v-4"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">AR 隐形眼镜</h3>
+              <div class="device-subtitle">AR Smart Contact Lens</div>
+              <div class="device-metrics">眼部：眼动、疲劳、眨眼、视觉交互。</div>
+              <div class="tags"><span class="tag">眨眼识别 90%</span><span class="tag">覆盖 76%</span></div>
+            </div>
+          </article>
+
+          <article class="device-card" data-device="earbuds">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><path d="M28 10c7 1 12 7 12 14s-5 13-12 14"/><path d="M24 15c4 1 7 4 7 9s-3 8-7 9"/><path d="M16 19c2 1 4 3 4 5s-2 4-4 5"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">智能耳塞</h3>
+              <div class="device-subtitle">Smart Earbuds</div>
+              <div class="device-metrics">耳部：听觉增强、语音助手、健康状态监测。</div>
+              <div class="tags"><span class="tag">佩戴识别 95%</span><span class="tag">覆盖 72%</span></div>
+            </div>
+          </article>
+
+          <article class="device-card" data-device="wristband">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><rect x="13" y="10" width="22" height="28" rx="6"/><path d="M17 25h5l3-7 4 13 3-6h4"/><path d="M18 6h12M18 42h12"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">智能手表 / 生物腕带</h3>
+              <div class="device-subtitle">Smartwatch / Bio Wristband</div>
+              <div class="device-metrics">手腕：PPG、SpO2、活动量、皮温、睡眠。</div>
+              <div class="tags"><span class="tag">心率 ±1-2 bpm</span><span class="tag">SpO2 ±2%</span><span class="tag">覆盖 90%</span></div>
+            </div>
+          </article>
+        </div>
+
+        <div class="body-stage" aria-label="全身智能穿戴设备锚点图">
+          <div class="aura"></div>
+          <div class="platform"></div>
+          <svg class="connectors" viewBox="0 0 480 650" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M235 82 C170 76 95 84 16 92" />
+            <path d="M268 112 C360 112 420 120 464 142" />
+            <path d="M176 116 C108 136 58 184 16 236" />
+            <path d="M240 224 C350 226 410 250 464 284" />
+            <path d="M135 354 C90 370 48 430 16 500" />
+            <path d="M345 385 C400 390 438 432 464 486" />
+            <path d="M240 318 C340 322 402 348 464 372" />
+            <path d="M306 485 C386 500 434 546 464 590" />
+            <path d="M314 572 C380 582 426 612 464 632" />
+          </svg>
+          <svg class="human-svg" viewBox="0 0 360 620" role="img" aria-label="偏现实未来人体模型">
+            <defs>
+              <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#dce7ea"/>
+                <stop offset=".36" stop-color="#748391"/>
+                <stop offset="1" stop-color="#111923"/>
+              </linearGradient>
+              <linearGradient id="suit" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#253245"/>
+                <stop offset=".55" stop-color="#0c121d"/>
+                <stop offset="1" stop-color="#05070d"/>
+              </linearGradient>
+            </defs>
+            <ellipse cx="180" cy="58" rx="38" ry="48" fill="url(#body)" stroke="#c7f8ff" stroke-width="1.4"/>
+            <path d="M131 114 C146 92 214 92 229 114 C252 168 248 256 219 302 C200 320 160 320 141 302 C112 256 108 168 131 114Z" fill="url(#suit)" stroke="#8ef1ff" stroke-width="1.4"/>
+            <path d="M129 132 C86 160 72 253 84 324 C93 340 111 338 118 321 C116 262 131 206 150 151Z" fill="url(#body)" stroke="#7deaff" stroke-width="1.1"/>
+            <path d="M231 132 C274 160 288 253 276 324 C267 340 249 338 242 321 C244 262 229 206 210 151Z" fill="url(#body)" stroke="#7deaff" stroke-width="1.1"/>
+            <path d="M139 314 C126 380 118 506 131 584 C141 601 164 599 170 580 C171 482 176 395 181 338Z" fill="url(#body)" stroke="#7deaff" stroke-width="1.1"/>
+            <path d="M221 314 C234 380 242 506 229 584 C219 601 196 599 190 580 C189 482 184 395 179 338Z" fill="url(#body)" stroke="#7deaff" stroke-width="1.1"/>
+            <path d="M138 126 C156 162 204 162 222 126" fill="none" stroke="#45e8ff" stroke-width="2" opacity=".65"/>
+            <path d="M142 210 C164 232 196 232 218 210" fill="none" stroke="#ff9f35" stroke-width="2" opacity=".8"/>
+            <path d="M143 298 C160 314 200 314 217 298" fill="none" stroke="#45e8ff" stroke-width="1.6" opacity=".65"/>
+            <path d="M156 126 L181 302 L205 126" fill="none" stroke="#45e8ff" stroke-width="1" opacity=".34"/>
+            <circle cx="180" cy="58" r="8" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="194" cy="84" r="7" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="141" cy="88" r="7" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="180" cy="222" r="8" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="105" cy="318" r="7" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="262" cy="350" r="7" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="180" cy="306" r="8" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="214" cy="468" r="8" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+            <circle cx="210" cy="579" r="8" fill="#fff0a3" stroke="#ff9f35" stroke-width="2"/>
+          </svg>
+        </div>
+
+        <div id="rightDeviceStack" class="card-stack" data-device-side="right">
+          <article class="device-card" data-device="chest-patch">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><rect x="10" y="12" width="28" height="24" rx="6"/><path d="M16 24h5l3-8 5 17 3-8h4"/><path d="M39 20h4v8h-4"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">生命体征胸贴</h3>
+              <div class="device-subtitle">Vital Sign Chest Patch</div>
+              <div class="device-metrics">胸口：ECG、心率、HRV、呼吸率、压力趋势。</div>
+              <div class="tags"><span class="tag">心率 ±1-2 bpm</span><span class="tag">呼吸 ±1 rpm</span><span class="tag">覆盖 93%</span></div>
+            </div>
+          </article>
+
+          <article class="device-card" data-device="ring">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="13"/><circle cx="24" cy="24" r="7"/><path d="M37 17l5-3M37 31l5 3"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">智能指环</h3>
+              <div class="device-subtitle">Smart Ring</div>
+              <div class="device-metrics">手指：心率、睡眠、体温趋势、恢复状态。</div>
+              <div class="tags"><span class="tag">体温 ±0.2°C</span><span class="tag">覆盖 86%</span></div>
+            </div>
+          </article>
+
+          <article class="device-card" data-device="waist-patch">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><path d="M7 22c9-7 25-7 34 0v9c-9 5-25 5-34 0z"/><path d="M13 25h22"/><path d="M18 18v16M30 18v16"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">能量腰带 / 腹部贴片</h3>
+              <div class="device-subtitle">Energy Belt / Abdominal Patch</div>
+              <div class="device-metrics">腹部/腰部：ESG、胃电节律、核心体温、消化负荷。</div>
+              <div class="tags"><span class="tag">ESG 节律识别 85%</span><span class="tag">核心体温 ±0.2°C</span><span class="tag">覆盖 82%</span></div>
+            </div>
+          </article>
+
+          <article class="device-card" data-device="knee-band">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><path d="M22 6h8l-2 14 7 6-4 16H18l-5-15 8-7z"/><path d="M17 28h16"/><path d="M22 20h6"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">增强护膝 / 腿环</h3>
+              <div class="device-subtitle">Smart Knee Guard / Leg Band</div>
+              <div class="device-metrics">膝腿：EMG、姿态、运动负荷、关节稳定性。</div>
+              <div class="tags"><span class="tag">姿态识别 92%</span><span class="tag">负荷评估 ±5%</span><span class="tag">覆盖 85%</span></div>
+            </div>
+          </article>
+
+          <article class="device-card" data-device="smart-shoes">
+            <div class="icon-box">
+              <svg viewBox="0 0 48 48"><path d="M8 31c9 1 16-4 21-13l7 3c1 5 3 8 7 10v5H8z"/><path d="M14 36h27"/><path d="M28 20l-5 7"/></svg>
+            </div>
+            <div>
+              <h3 class="device-title">智能运动鞋</h3>
+              <div class="device-subtitle">Smart Sneakers</div>
+              <div class="device-metrics">脚部：步态、冲击、足压、位置追踪。</div>
+              <div class="tags"><span class="tag">步态识别 95%</span><span class="tag">冲击峰值 ±5%</span><span class="tag">覆盖 89%</span></div>
+            </div>
+          </article>
+          <div id="customDeviceStack"></div>
+        </div>
+
+        <aside class="equipment-panel" aria-label="已选智能设备装备栏">
+          <div class="equipment-title">
+            <div>装备栏 <span id="equipmentCount">0 / 12</span></div>
+            <button id="openEquipmentPage" class="equipment-page-button" type="button">装备页</button>
+          </div>
+          <div id="equipmentGrid" class="equipment-grid"></div>
+        </aside>
+      </div>
+
+    </div>
+
+    <div id="equipmentPage" class="equipment-page" hidden>
+      <div class="equipment-page-shell">
+        <div class="equipment-page-head">
+          <h2>智能设备装备页</h2>
+          <div class="equipment-page-actions">
+            <button id="fullEquipmentView" class="equipment-view-button active" type="button">完整信息</button>
+            <button id="cardEquipmentView" class="equipment-view-button" type="button">卡片展示</button>
+            <button id="closeEquipmentPage" class="equipment-close-button" type="button">关闭</button>
+          </div>
+        </div>
+        <div id="equipmentPageBody" class="equipment-page-body"></div>
+        <button id="addEquipmentButton" class="add-equipment-fab" type="button" aria-label="新增装备">+</button>
+      </div>
+    </div>
+
+    <div id="equipmentPickerDialog" class="action-dialog" hidden>
+      <div class="dialog-card equipment-picker-card" role="dialog" aria-modal="true" aria-labelledby="equipmentPickerTitle">
+        <h3 id="equipmentPickerTitle">添加装备</h3>
+        <p class="dialog-copy">从现有装备中勾选加入当前方案，或继续自定义新增装备。</p>
+        <div id="equipmentPickerList" class="equipment-picker-list"></div>
+        <div class="dialog-actions">
+          <button id="customEquipmentFromPicker" type="button">自定义新增</button>
+          <button id="cancelEquipmentPicker" type="button">取消</button>
+          <button id="confirmEquipmentPicker" class="tool-button" type="button">加入方案</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="equipmentDialog" class="action-dialog" hidden>
+      <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="equipmentDialogTitle">
+        <h3 id="equipmentDialogTitle">新增装备</h3>
+        <p class="dialog-copy">新增时只录入装备展示基础信息，完整信息、精度、规格等可在设备详情页继续补充。</p>
+        <div class="dialog-field">
+          <label for="newEquipmentName">中文名</label>
+          <input id="newEquipmentName" type="text" placeholder="例如：智能臂环" />
+        </div>
+        <div class="dialog-field">
+          <label for="newEquipmentEnglish">英文名</label>
+          <input id="newEquipmentEnglish" type="text" placeholder="Smart Arm Band" />
+        </div>
+        <div class="dialog-field">
+          <label for="newEquipmentModel">型号</label>
+          <input id="newEquipmentModel" type="text" placeholder="例如：AB-100" />
+        </div>
+        <div class="dialog-field">
+          <label for="newEquipmentValue">价值</label>
+          <input id="newEquipmentValue" type="text" placeholder="例如：1999 元" />
+        </div>
+        <div class="dialog-field">
+          <label for="newEquipmentUsage">使用位置</label>
+          <input id="newEquipmentUsage" type="text" placeholder="例如：手腕 / 胸口 / 腰部" />
+        </div>
+        <div class="dialog-field">
+          <label for="newEquipmentFunctionPoints">监测功能点</label>
+          <input id="newEquipmentFunctionPoints" type="text" placeholder="例如：心率 / 血氧 / ESG" />
+        </div>
+        <div class="dialog-field">
+          <label for="newEquipmentUrl">网址</label>
+          <div class="url-fetch-row">
+            <input id="newEquipmentUrl" type="url" placeholder="https://example.com/product" />
+            <button id="fetchEquipmentInfo" class="fetch-equipment-button" type="button">抓取信息</button>
+            <button id="openProductBrowser" class="fetch-equipment-button" type="button">打开网页登录</button>
+            <button id="collectBrowserProduct" class="fetch-equipment-button" type="button">登录后抓取</button>
+          </div>
+          <div id="equipmentFetchStatus" class="fetch-status" aria-live="polite"></div>
+        </div>
+        <div class="dialog-actions">
+          <button id="cancelEquipmentDialog" type="button">取消</button>
+          <button id="confirmEquipmentDialog" class="tool-button" type="button">新增</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="equipmentPreviewDialog" class="action-dialog" hidden>
+      <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="equipmentPreviewTitle">
+        <h3 id="equipmentPreviewTitle">设备大图</h3>
+        <div id="equipmentPreviewVisual" class="equipment-preview-visual"></div>
+        <div class="dialog-actions">
+          <button id="closeEquipmentPreview" type="button">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="equipmentDetailDialog" class="action-dialog" hidden>
+      <div class="dialog-card equipment-detail-card" role="dialog" aria-modal="true" aria-labelledby="equipmentDetailTitle">
+        <h3 id="equipmentDetailTitle">设备详情</h3>
+        <div id="equipmentDetailBody" class="equipment-detail-body"></div>
+        <div class="dialog-actions">
+          <button id="deleteEquipmentDetail" class="danger" type="button">删除设备</button>
+          <button id="saveEquipmentDetail" class="tool-button" type="button">保存修改</button>
+          <button id="closeEquipmentDetail" type="button">关闭</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="actionDialog" class="action-dialog" hidden>
+      <div class="dialog-card" role="dialog" aria-modal="true" aria-labelledby="dialogTitle">
+        <h3 id="dialogTitle">新增锚点</h3>
+        <p id="dialogCopy" class="dialog-copy"></p>
+        <div id="dialogLabelField" class="dialog-field">
+          <label for="dialogAnchorLabel">中文说明</label>
+          <input id="dialogAnchorLabel" type="text" />
+        </div>
+        <div id="dialogDeviceField" class="dialog-field">
+          <label for="dialogAnchorDevice">对应智能设备框</label>
+          <select id="dialogAnchorDevice"></select>
+        </div>
+        <div class="dialog-actions">
+          <button id="dialogDeleteAnchor" class="danger" type="button" hidden>删除此锚点</button>
+          <button id="cancelDialog" type="button">取消</button>
+          <button id="confirmDialog" class="tool-button" type="button">确认</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="schemeNameDialog" class="action-dialog" hidden>
+      <div class="dialog-card scheme-name-card" role="dialog" aria-modal="true" aria-labelledby="schemeNameTitle">
+        <h3 id="schemeNameTitle">方案命名</h3>
+        <p class="dialog-copy">命名后会保存当前完整页面，并生成系统评测缩略图。</p>
+        <div class="dialog-field">
+          <label for="schemeNameInput">方案名称</label>
+          <input id="schemeNameInput" type="text" placeholder="例如：运动健康监测方案" />
+        </div>
+        <div class="dialog-actions">
+          <button id="cancelSchemeName" type="button">取消</button>
+          <button id="confirmSchemeName" class="tool-button" type="button">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <section class="share-section" id="share-card">
+      <div class="share-copy">
+        <div class="share-copy-main">
+          <h2>系统评测</h2>
+        </div>
+      </div>
+      <div class="share-metrics">
+        <div class="share-metric">
+          <div class="share-metric-label">检测覆盖</div>
+          <div class="share-metric-value coverage">91%</div>
+          <div class="share-metric-note" data-coverage-note>6 大健康域：心肺、睡眠、胃肠、体温、活动、姿态。</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">系统价值</div>
+          <div class="share-metric-value money">xx 元</div>
+          <div class="share-metric-note">可按设备成本、算法服务、报告交付和集成实施费用替换为真实报价。</div>
+        </div>
+        <div class="share-metric">
+          <div class="share-metric-label">精度评价</div>
+          <div class="share-metric-value grade">A-</div>
+          <div class="share-metric-note" data-grade-note>基于消费级可穿戴设备与专用贴片模块的综合展示等级。</div>
+        </div>
+        <div class="share-radar-card" aria-label="功能点和精度雷达图">
+          <div class="share-radar-head">
+            <span>功能点 / 精度雷达图</span>
+            <span class="share-radar-score">六维评估</span>
+          </div>
+          <svg class="share-radar" viewBox="0 0 240 220" role="img" aria-label="心肺、睡眠、胃肠、体温、活动、姿态六项功能覆盖和精度表现雷达图">
+            <polygon class="grid" points="120,81.9 140.2,93.3 140.2,116.7 120,128.1 99.8,116.7 99.8,93.3" />
+            <polygon class="grid" points="120,58.8 160.4,81.7 160.4,128.3 120,151.2 79.6,128.3 79.6,81.7" />
+            <polygon class="grid" points="120,35 180.6,70 180.6,140 120,175 59.4,140 59.4,70" />
+            <line class="axis" x1="120" y1="105" x2="120" y2="35" />
+            <line class="axis" x1="120" y1="105" x2="180.6" y2="70" />
+            <line class="axis" x1="120" y1="105" x2="180.6" y2="140" />
+            <line class="axis" x1="120" y1="105" x2="120" y2="175" />
+            <line class="axis" x1="120" y1="105" x2="59.4" y2="140" />
+            <line class="axis" x1="120" y1="105" x2="59.4" y2="70" />
+            <polygon class="coverage" points="120,39.2 174.6,73.5 169.7,133.7 120,166.6 63.6,137.6 67.9,74.9" />
+            <polygon class="precision" points="120,42 172.1,74.9 167.3,132.3 120,163.8 66.1,136.2 68.5,75.2" />
+            <circle class="dot" cx="120" cy="39.2" r="2.8" />
+            <circle class="dot" cx="174.6" cy="73.5" r="2.8" />
+            <circle class="dot" cx="169.7" cy="133.7" r="2.8" />
+            <circle class="dot" cx="120" cy="166.6" r="2.8" />
+            <circle class="dot" cx="63.6" cy="137.6" r="2.8" />
+            <circle class="dot" cx="67.9" cy="74.9" r="2.8" />
+            <text x="120" y="22">心肺</text>
+            <text x="197" y="67">睡眠</text>
+            <text x="198" y="148">胃肠</text>
+            <text x="120" y="197">体温</text>
+            <text x="42" y="148">活动</text>
+            <text x="43" y="67">姿态</text>
+          </svg>
+          <div class="share-radar-copy">
+            <div><strong>评测维度：</strong>心肺、睡眠、胃肠、体温、活动、姿态。</div>
+            <div><strong>图形含义：</strong>青色代表功能覆盖，橙色代表精度表现；越靠外表示该维度表现越强。</div>
+            <div class="share-radar-legend">
+              <span><span class="legend-dot coverage"></span>功能覆盖</span>
+              <span><span class="legend-dot precision"></span>精度表现</span>
+            </div>
+          </div>
+        </div>
+        <div class="share-actions">
+          <button id="saveSchemeButton" class="save-scheme-button" type="button">保存方案</button>
+          <div id="saveSchemeStatus" class="save-scheme-status" aria-live="polite"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="equipment-info-section" aria-labelledby="equipmentInfoTitle">
+      <div class="equipment-info-head">
+        <h2 id="equipmentInfoTitle">装备信息</h2>
+        <div id="equipmentInfoCount" class="equipment-info-count">0 个装备</div>
+      </div>
+      <div id="equipmentInfoBody"></div>
+      <button id="addEquipmentFromInfo" class="equipment-info-add" type="button" aria-label="新增装备">+</button>
+    </section>
+
+    <section class="scheme-section" aria-labelledby="schemeGalleryTitle">
+      <div class="scheme-section-head">
+        <h2 id="schemeGalleryTitle">方案展示</h2>
+        <div id="schemeCount" class="scheme-count">0 个方案</div>
+      </div>
+      <div id="schemeGallery" class="scheme-gallery"></div>
+    </section>
+  </main>
+  <script>
+    const STORAGE_KEY = "ai-life-anchor-config-v2";
+    const EQUIPMENT_STORAGE_KEY = "ai-life-custom-equipment-v1";
+    const DELETED_EQUIPMENT_STORAGE_KEY = "ai-life-deleted-equipment-v1";
+    const EQUIPMENT_OVERRIDES_STORAGE_KEY = "ai-life-equipment-overrides-v1";
+    const SAVED_SCHEMES_STORAGE_KEY = "ai-life-saved-schemes-v1";
+    const DEVICE_LAYOUT_STORAGE_KEY = "ai-life-device-layout-v1";
+    const REMOVED_EQUIPMENT_STORAGE_KEY = "ai-life-removed-equipment-v1";
+
+    const defaultAnchors = [
+      { id: "head", label: "头部", x: 41.4, y: 22.4, device: "headset" },
+      { id: "eye", label: "眼部", x: 41.5, y: 25.1, device: "ar-lens" },
+      { id: "ear", label: "耳部", x: 38.7, y: 25.6, device: "earbuds" },
+      { id: "chest", label: "胸口", x: 41.3, y: 36.5, device: "chest-patch" },
+      { id: "wrist", label: "手腕", x: 33.4, y: 53.4, device: "wristband" },
+      { id: "finger", label: "手指", x: 49.0, y: 57.2, device: "ring" },
+      { id: "waist", label: "腹部/腰部", x: 41.4, y: 48.9, device: "waist-patch" },
+      { id: "knee", label: "膝腿", x: 45.5, y: 73.4, device: "knee-band" },
+      { id: "foot", label: "脚部", x: 46.4, y: 90.2, device: "smart-shoes" }
+    ];
+
+    const defaultDeviceLayout = {
+      left: ["headset", "ar-lens", "earbuds", "wristband"],
+      right: ["chest-patch", "ring", "waist-patch", "knee-band", "smart-shoes"]
+    };
+
+    const hero = document.querySelector(".hero-shell");
+    const anchorLayer = document.getElementById("anchorLayer");
+    const connectionLayer = document.getElementById("connectionLayer");
+    const leftDeviceStack = document.getElementById("leftDeviceStack");
+    const rightDeviceStack = document.getElementById("rightDeviceStack");
+    const customDeviceStack = document.getElementById("customDeviceStack");
+    const equipmentGrid = document.getElementById("equipmentGrid");
+    const equipmentCount = document.getElementById("equipmentCount");
+    const equipmentPage = document.getElementById("equipmentPage");
+    const equipmentPageBody = document.getElementById("equipmentPageBody");
+    const openEquipmentPageButton = document.getElementById("openEquipmentPage");
+    const closeEquipmentPageButton = document.getElementById("closeEquipmentPage");
+    const fullEquipmentViewButton = document.getElementById("fullEquipmentView");
+    const cardEquipmentViewButton = document.getElementById("cardEquipmentView");
+    const addEquipmentButton = document.getElementById("addEquipmentButton");
+    const equipmentPickerDialog = document.getElementById("equipmentPickerDialog");
+    const equipmentPickerList = document.getElementById("equipmentPickerList");
+    const customEquipmentFromPickerButton = document.getElementById("customEquipmentFromPicker");
+    const cancelEquipmentPickerButton = document.getElementById("cancelEquipmentPicker");
+    const confirmEquipmentPickerButton = document.getElementById("confirmEquipmentPicker");
+    const equipmentDialog = document.getElementById("equipmentDialog");
+    const newEquipmentUrl = document.getElementById("newEquipmentUrl");
+    const newEquipmentName = document.getElementById("newEquipmentName");
+    const newEquipmentEnglish = document.getElementById("newEquipmentEnglish");
+    const newEquipmentModel = document.getElementById("newEquipmentModel");
+    const newEquipmentValue = document.getElementById("newEquipmentValue");
+    const newEquipmentUsage = document.getElementById("newEquipmentUsage");
+    const newEquipmentFunctionPoints = document.getElementById("newEquipmentFunctionPoints");
+    const fetchEquipmentInfoButton = document.getElementById("fetchEquipmentInfo");
+    const openProductBrowserButton = document.getElementById("openProductBrowser");
+    const collectBrowserProductButton = document.getElementById("collectBrowserProduct");
+    const equipmentFetchStatus = document.getElementById("equipmentFetchStatus");
+    const cancelEquipmentDialogButton = document.getElementById("cancelEquipmentDialog");
+    const confirmEquipmentDialogButton = document.getElementById("confirmEquipmentDialog");
+    const equipmentPreviewDialog = document.getElementById("equipmentPreviewDialog");
+    const equipmentPreviewTitle = document.getElementById("equipmentPreviewTitle");
+    const equipmentPreviewVisual = document.getElementById("equipmentPreviewVisual");
+    const closeEquipmentPreviewButton = document.getElementById("closeEquipmentPreview");
+    const equipmentDetailDialog = document.getElementById("equipmentDetailDialog");
+    const equipmentDetailTitle = document.getElementById("equipmentDetailTitle");
+    const equipmentDetailBody = document.getElementById("equipmentDetailBody");
+    const closeEquipmentDetailButton = document.getElementById("closeEquipmentDetail");
+    const saveEquipmentDetailButton = document.getElementById("saveEquipmentDetail");
+    const deleteEquipmentDetailButton = document.getElementById("deleteEquipmentDetail");
+    const shareLinkButton = document.getElementById("shareLinkButton");
+    const shareImageButton = document.getElementById("shareImageButton");
+    const saveSchemeButton = document.getElementById("saveSchemeButton");
+    const saveSchemeStatus = document.getElementById("saveSchemeStatus");
+    const equipmentInfoBody = document.getElementById("equipmentInfoBody");
+    const equipmentInfoCount = document.getElementById("equipmentInfoCount");
+    const addEquipmentFromInfoButton = document.getElementById("addEquipmentFromInfo");
+    const schemeGallery = document.getElementById("schemeGallery");
+    const schemeCount = document.getElementById("schemeCount");
+    const schemeNameDialog = document.getElementById("schemeNameDialog");
+    const schemeNameInput = document.getElementById("schemeNameInput");
+    const cancelSchemeNameButton = document.getElementById("cancelSchemeName");
+    const confirmSchemeNameButton = document.getElementById("confirmSchemeName");
+    const actionDialog = document.getElementById("actionDialog");
+    const dialogTitle = document.getElementById("dialogTitle");
+    const dialogCopy = document.getElementById("dialogCopy");
+    const dialogLabelField = document.getElementById("dialogLabelField");
+    const dialogDeviceField = document.getElementById("dialogDeviceField");
+    const dialogLabelInput = document.getElementById("dialogAnchorLabel");
+    const dialogDeviceSelect = document.getElementById("dialogAnchorDevice");
+    const dialogDeleteButton = document.getElementById("dialogDeleteAnchor");
+    const cancelDialogButton = document.getElementById("cancelDialog");
+    const confirmDialogButton = document.getElementById("confirmDialog");
+
+    let anchors = loadAnchors();
+    let selectedAnchorId = anchors[0]?.id || null;
+    let dragState = null;
+    let longPressTimer = null;
+    let longPressStart = null;
+    let dialogMode = null;
+    let pendingAnchorPosition = null;
+    let pendingEditAnchorId = null;
+    let equipmentViewMode = "full";
+    let customEquipment = loadCustomEquipment();
+    let deletedEquipmentIds = loadDeletedEquipmentIds();
+    let equipmentOverrides = loadEquipmentOverrides();
+    let deviceLayout = loadDeviceLayout();
+    let removedEquipmentIds = loadRemovedEquipmentIds();
+    let deviceCardDragId = null;
+    let activeDetailDeviceId = null;
+    let latestCollectedProduct = null;
+
+    function loadAnchors() {
+      if (window.__SNAPSHOT_STATE__?.anchors) return structuredClone(window.__SNAPSHOT_STATE__.anchors);
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+        if (Array.isArray(saved)) return saved;
+      } catch (error) {
+        console.warn("Anchor config ignored:", error);
+      }
+      return structuredClone(defaultAnchors);
+    }
+
+    function saveAnchors() {
+      if (window.__SNAPSHOT_STATE__) return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(anchors));
+    }
+
+    function loadCustomEquipment() {
+      if (window.__SNAPSHOT_STATE__?.customEquipment) return structuredClone(window.__SNAPSHOT_STATE__.customEquipment);
+      try {
+        const saved = JSON.parse(localStorage.getItem(EQUIPMENT_STORAGE_KEY) || "[]");
+        if (Array.isArray(saved)) return saved;
+      } catch (error) {
+        console.warn("Custom equipment ignored:", error);
+      }
+      return [];
+    }
+
+    function saveCustomEquipment() {
+      if (window.__SNAPSHOT_STATE__) return;
+      localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(customEquipment));
+    }
+
+    function loadDeletedEquipmentIds() {
+      if (window.__SNAPSHOT_STATE__?.deletedEquipmentIds) return structuredClone(window.__SNAPSHOT_STATE__.deletedEquipmentIds);
+      try {
+        const saved = JSON.parse(localStorage.getItem(DELETED_EQUIPMENT_STORAGE_KEY) || "[]");
+        if (Array.isArray(saved)) return saved;
+      } catch (error) {
+        console.warn("Deleted equipment ignored:", error);
+      }
+      return [];
+    }
+
+    function saveDeletedEquipmentIds() {
+      if (window.__SNAPSHOT_STATE__) return;
+      localStorage.setItem(DELETED_EQUIPMENT_STORAGE_KEY, JSON.stringify(deletedEquipmentIds));
+    }
+
+    function loadEquipmentOverrides() {
+      if (window.__SNAPSHOT_STATE__?.equipmentOverrides) return structuredClone(window.__SNAPSHOT_STATE__.equipmentOverrides);
+      try {
+        const saved = JSON.parse(localStorage.getItem(EQUIPMENT_OVERRIDES_STORAGE_KEY) || "{}");
+        if (saved && typeof saved === "object" && !Array.isArray(saved)) return saved;
+      } catch (error) {
+        console.warn("Equipment overrides ignored:", error);
+      }
+      return {};
+    }
+
+    function saveEquipmentOverrides() {
+      if (window.__SNAPSHOT_STATE__) return;
+      localStorage.setItem(EQUIPMENT_OVERRIDES_STORAGE_KEY, JSON.stringify(equipmentOverrides));
+    }
+
+    function loadDeviceLayout() {
+      if (window.__SNAPSHOT_STATE__?.deviceLayout) return structuredClone(window.__SNAPSHOT_STATE__.deviceLayout);
+      try {
+        const saved = JSON.parse(localStorage.getItem(DEVICE_LAYOUT_STORAGE_KEY) || "null");
+        if (saved && Array.isArray(saved.left) && Array.isArray(saved.right)) return saved;
+      } catch (error) {
+        console.warn("Device layout ignored:", error);
+      }
+      return structuredClone(defaultDeviceLayout);
+    }
+
+    function saveDeviceLayout() {
+      if (window.__SNAPSHOT_STATE__) return;
+      localStorage.setItem(DEVICE_LAYOUT_STORAGE_KEY, JSON.stringify(deviceLayout));
+    }
+
+    function loadRemovedEquipmentIds() {
+      if (window.__SNAPSHOT_STATE__?.removedEquipmentIds) return structuredClone(window.__SNAPSHOT_STATE__.removedEquipmentIds);
+      try {
+        const saved = JSON.parse(localStorage.getItem(REMOVED_EQUIPMENT_STORAGE_KEY) || "[]");
+        if (Array.isArray(saved)) return saved;
+      } catch (error) {
+        console.warn("Removed equipment ignored:", error);
+      }
+      return [];
+    }
+
+    function saveRemovedEquipmentIds() {
+      if (window.__SNAPSHOT_STATE__) return;
+      localStorage.setItem(REMOVED_EQUIPMENT_STORAGE_KEY, JSON.stringify(removedEquipmentIds));
+    }
+
+    function loadSavedSchemes() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(SAVED_SCHEMES_STORAGE_KEY) || "[]");
+        if (Array.isArray(saved)) return saved;
+      } catch (error) {
+        console.warn("Saved schemes ignored:", error);
+      }
+      return [];
+    }
+
+    function saveSavedSchemes(schemes) {
+      localStorage.setItem(SAVED_SCHEMES_STORAGE_KEY, JSON.stringify(schemes));
+    }
+
+    function getEvaluationSnapshot() {
+      return {
+        coverage: document.querySelector(".share-metric-value.coverage")?.textContent?.trim() || "0%",
+        value: document.querySelector(".share-metric-value.money")?.textContent?.trim() || "xx 元",
+        grade: document.querySelector(".share-metric-value.grade")?.textContent?.trim() || "待完善",
+        dimensions: "心肺 / 睡眠 / 胃肠 / 体温 / 活动 / 姿态"
+      };
+    }
+
+    function buildSchemeThumbnail(evaluation, savedAt, title) {
+      const timestamp = new Date(savedAt).toLocaleString("zh-CN", { hour12: false });
+      const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+          <defs>
+            <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#061a2a"/>
+              <stop offset="1" stop-color="#02070d"/>
+            </linearGradient>
+            <filter id="glow"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <rect width="640" height="360" rx="16" fill="url(#bg)"/>
+          <circle cx="118" cy="80" r="110" fill="#2de8ff" opacity=".08"/>
+          <circle cx="546" cy="72" r="120" fill="#ff9f35" opacity=".08"/>
+          <rect x="22" y="22" width="596" height="316" rx="14" fill="none" stroke="#2de8ff" opacity=".46"/>
+          <text x="42" y="64" fill="#9befff" font-size="20" font-family="Arial, sans-serif" font-weight="700">系统评测</text>
+          <text x="42" y="104" fill="#ffffff" font-size="28" font-family="Arial, sans-serif" font-weight="800">${escapeHtml(title)}</text>
+          <text x="42" y="134" fill="#9fb8c4" font-size="14" font-family="Arial, sans-serif">${escapeHtml(timestamp)}</text>
+          <g transform="translate(42 176)">
+            <rect width="160" height="92" rx="10" fill="#071625" stroke="#2de8ff" opacity=".92"/>
+            <text x="18" y="30" fill="#9befff" font-size="15" font-family="Arial, sans-serif">检测覆盖</text>
+            <text x="18" y="70" fill="#ffffff" font-size="34" font-family="Arial, sans-serif" font-weight="800">${escapeHtml(evaluation.coverage)}</text>
+          </g>
+          <g transform="translate(230 176)">
+            <rect width="160" height="92" rx="10" fill="#071625" stroke="#ff9f35" opacity=".92"/>
+            <text x="18" y="30" fill="#9befff" font-size="15" font-family="Arial, sans-serif">系统价值</text>
+            <text x="18" y="70" fill="#fff6d9" font-size="30" font-family="Arial, sans-serif" font-weight="800">${escapeHtml(evaluation.value)}</text>
+          </g>
+          <g transform="translate(418 176)">
+            <rect width="160" height="92" rx="10" fill="#071625" stroke="#2de8ff" opacity=".92"/>
+            <text x="18" y="30" fill="#9befff" font-size="15" font-family="Arial, sans-serif">精度评价</text>
+            <text x="18" y="70" fill="#bfffd9" font-size="36" font-family="Arial, sans-serif" font-weight="800">${escapeHtml(evaluation.grade)}</text>
+          </g>
+          <polygon points="500,66 552,96 552,156 500,186 448,156 448,96" fill="#2de8ff" opacity=".16" stroke="#2de8ff" filter="url(#glow)"/>
+          <polygon points="500,72 546,99 542,151 500,178 454,151 456,99" fill="#ff9f35" opacity=".18" stroke="#ff9f35"/>
+          <text x="42" y="312" fill="#c7e5ec" font-size="16" font-family="Arial, sans-serif">功能点 / 精度雷达图：${escapeHtml(evaluation.dimensions)}</text>
+        </svg>
+      `;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+
+    function setShareStatus(message) {
+      if (saveSchemeStatus) saveSchemeStatus.textContent = message;
+    }
+
+    function fallbackCopyText(text) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.left = "-9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+
+    async function shareLink() {
+      const url = window.location.href;
+      try {
+        if (navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(url);
+        } else {
+          fallbackCopyText(url);
+        }
+        setShareStatus("分享链接已复制。");
+      } catch (error) {
+        console.warn("Share link failed:", error);
+        fallbackCopyText(url);
+        setShareStatus("分享链接已复制。");
+      }
+    }
+
+    async function shareImage() {
+      setShareStatus("正在生成 PNG 图片...");
+      try {
+        const response = await fetch("/api/share-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ html: createPageSnapshot().html })
+        });
+
+        if (!response.ok) {
+          const error = await response.json().catch(() => ({}));
+          setShareStatus(error.message || "PNG 图片生成失败。");
+          return;
+        }
+
+        const blob = await response.blob();
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = "system-monitor-evaluation.png";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        setShareStatus("监测系统与系统评测 PNG 已生成下载。");
+      } catch (error) {
+        console.warn("Share image failed:", error);
+        setShareStatus("PNG 图片生成失败，请确认后端服务已启动。");
+      }
+    }
+
+    function createSnapshotShareScript() {
+      return `
+        (() => {
+          const status = document.getElementById("snapshotShareStatus");
+          const setStatus = (message) => {
+            if (status) status.textContent = message;
+          };
+          const fallbackCopyText = (text) => {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            textarea.remove();
+          };
+          document.getElementById("snapshotShareLinkButton")?.addEventListener("click", async () => {
+            const url = window.location.href;
+            try {
+              if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(url);
+              } else {
+                fallbackCopyText(url);
+              }
+              setStatus("分享链接已复制。");
+            } catch (error) {
+              fallbackCopyText(url);
+              setStatus("分享链接已复制。");
+            }
+          });
+          document.getElementById("snapshotShareImageButton")?.addEventListener("click", async () => {
+            setStatus("正在生成 PNG 图片...");
+            try {
+              const response = await fetch("/api/share-image", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html: "<!doctype html>\\n" + document.documentElement.outerHTML })
+              });
+              if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                setStatus(error.message || "PNG 图片生成失败。");
+                return;
+              }
+              const blob = await response.blob();
+              const link = document.createElement("a");
+              link.href = URL.createObjectURL(blob);
+              link.download = "system-monitor-evaluation.png";
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+              setStatus("监测系统与系统评测 PNG 已生成下载。");
+            } catch (error) {
+              setStatus("PNG 图片生成失败，请确认后端服务已启动。");
+            }
+          });
+        })();
+      `;
+    }
+
+    function applySnapshotPageMode(doc, snapshotState) {
+      doc.querySelector(".scheme-section")?.remove();
+      doc.querySelector(".equipment-info-section")?.remove();
+      const shareActions = doc.querySelector(".share-actions");
+      if (shareActions) {
+        shareActions.innerHTML = `
+          <div class="share-buttons" aria-label="分享操作">
+            <button id="snapshotShareLinkButton" class="share-button" type="button">分享链接</button>
+            <button id="snapshotShareImageButton" class="share-button secondary" type="button">分享图片</button>
+          </div>
+          <div id="snapshotShareStatus" class="save-scheme-status" aria-live="polite"></div>
+        `;
+      }
+
+      doc.querySelectorAll("script").forEach((script) => script.remove());
+      const body = doc.querySelector("body");
+      if (!body) return;
+      const elementFactory = doc.createElement ? doc : doc.ownerDocument || document;
+      const runtimeState = {
+        anchors: snapshotState?.anchors || [],
+        customEquipment: snapshotState?.customEquipment || [],
+        deletedEquipmentIds: snapshotState?.deletedEquipmentIds || [],
+        equipmentOverrides: snapshotState?.equipmentOverrides || {},
+        deviceLayout: snapshotState?.deviceLayout || structuredClone(defaultDeviceLayout),
+        removedEquipmentIds: snapshotState?.removedEquipmentIds || [],
+        savedAt: snapshotState?.savedAt || new Date().toISOString()
+      };
+      const safeStateJson = JSON.stringify(runtimeState).replace(/</g, "\\u003c");
+
+      const stateScript = elementFactory.createElement("script");
+      stateScript.textContent = `window.__SNAPSHOT_STATE__ = ${safeStateJson};`;
+      body.appendChild(stateScript);
+
+      document.querySelectorAll("script").forEach((script) => {
+        const clonedScript = elementFactory.createElement("script");
+        clonedScript.textContent = script.textContent;
+        body.appendChild(clonedScript);
+      });
+
+      const shareScript = elementFactory.createElement("script");
+      shareScript.textContent = createSnapshotShareScript();
+      body.appendChild(shareScript);
+    }
+
+    function createPageSnapshot() {
+      const clonedDocument = document.documentElement.cloneNode(true);
+      const snapshotState = {
+        anchors,
+        customEquipment,
+        deletedEquipmentIds,
+        equipmentOverrides,
+        deviceLayout,
+        removedEquipmentIds,
+        savedAt: new Date().toISOString()
+      };
+      applySnapshotPageMode(clonedDocument, snapshotState);
+      const head = clonedDocument.querySelector("head");
+      if (head && !head.querySelector("base")) {
+        const base = document.createElement("base");
+        base.href = window.location.href;
+        head.prepend(base);
+      }
+      return {
+        html: `<!doctype html>\n${clonedDocument.outerHTML}`,
+        ...snapshotState
+      };
+    }
+
+    function renderSavedSchemes() {
+      if (!schemeGallery || !schemeCount) return;
+      const schemes = loadSavedSchemes();
+      schemeCount.textContent = `${schemes.length} 个方案`;
+      if (!schemes.length) {
+        schemeGallery.innerHTML = '<div class="scheme-empty">暂无保存方案。</div>';
+        return;
+      }
+      schemeGallery.innerHTML = schemes.map((scheme) => `
+        <article class="scheme-card">
+          <button class="scheme-thumbnail-button" type="button" data-open-scheme="${escapeAttribute(scheme.id)}" aria-label="打开 ${escapeAttribute(scheme.title)} 完整页">
+            <img class="scheme-thumbnail" src="${escapeAttribute(scheme.thumbnailUrl)}" alt="系统评测缩略图" loading="lazy" />
+          </button>
+          <div class="scheme-actions">
+            <button class="scheme-action-button" type="button" data-open-scheme="${escapeAttribute(scheme.id)}">打开完整页</button>
+            <button class="scheme-action-button danger" type="button" data-delete-scheme="${escapeAttribute(scheme.id)}">删除方案</button>
+          </div>
+        </article>
+      `).join("");
+      schemeGallery.querySelectorAll("[data-open-scheme]").forEach((button) => {
+        button.addEventListener("click", () => openSavedScheme(button.dataset.openScheme));
+      });
+      schemeGallery.querySelectorAll("[data-delete-scheme]").forEach((button) => {
+        button.addEventListener("click", () => showDeleteSchemeConfirm(button.dataset.deleteScheme));
+      });
+    }
+
+    function buildDefaultSchemeName() {
+      const now = new Date();
+      const date = now.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" }).replace(/\//g, "-");
+      const time = now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+      return `系统评测方案 ${date} ${time}`;
+    }
+
+    function openSchemeNameDialog() {
+      schemeNameInput.value = buildDefaultSchemeName();
+      schemeNameDialog.hidden = false;
+      schemeNameInput.focus();
+      schemeNameInput.select();
+    }
+
+    function closeSchemeNameDialog() {
+      schemeNameDialog.hidden = true;
+    }
+
+    function confirmSchemeNameDialog() {
+      const title = schemeNameInput.value.trim() || buildDefaultSchemeName();
+      closeSchemeNameDialog();
+      window.requestAnimationFrame(() => saveCurrentScheme(title));
+    }
+
+    function saveCurrentScheme(title) {
+      try {
+        const evaluation = getEvaluationSnapshot();
+        const snapshot = createPageSnapshot();
+        const scheme = {
+          id: `scheme-${Date.now()}`,
+          title,
+          savedAt: snapshot.savedAt,
+          evaluation,
+          thumbnailUrl: buildSchemeThumbnail(evaluation, snapshot.savedAt, title),
+          snapshot
+        };
+        const schemes = [scheme, ...loadSavedSchemes()].slice(0, 8);
+        saveSavedSchemes(schemes);
+        renderSavedSchemes();
+        saveSchemeStatus.textContent = "方案已保存。";
+      } catch (error) {
+        console.warn("Scheme save failed:", error);
+        saveSchemeStatus.textContent = "保存失败，请清理浏览器本地存储后重试。";
+      }
+    }
+
+    function openSavedScheme(schemeId) {
+      const scheme = loadSavedSchemes().find((item) => item.id === schemeId);
+      if (!scheme?.snapshot?.html) return;
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(scheme.snapshot.html, "text/html");
+      applySnapshotPageMode(doc, scheme.snapshot);
+      const html = `<!doctype html>\n${doc.documentElement.outerHTML}`;
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+
+    function removeSchemeDeleteConfirm() {
+      schemeGallery?.querySelector(".scheme-delete-popover")?.remove();
+    }
+
+    function showDeleteSchemeConfirm(schemeId) {
+      const schemes = loadSavedSchemes();
+      const scheme = schemes.find((item) => item.id === schemeId);
+      if (!scheme) return;
+      removeSchemeDeleteConfirm();
+      const trigger = schemeGallery?.querySelector(`[data-delete-scheme="${CSS.escape(schemeId)}"]`);
+      const card = trigger?.closest(".scheme-card");
+      if (!card) return;
+      const popover = document.createElement("div");
+      popover.className = "scheme-delete-popover";
+      popover.innerHTML = `
+        <div class="scheme-delete-title">删除方案？</div>
+        <div>确认删除“${escapeHtml(scheme.title)}”？删除后无法恢复。</div>
+        <div class="scheme-delete-actions">
+          <button class="scheme-action-button" type="button" data-cancel-delete-scheme>取消</button>
+          <button class="scheme-action-button danger" type="button" data-confirm-delete-scheme="${escapeAttribute(scheme.id)}">删除</button>
+        </div>
+      `;
+      card.appendChild(popover);
+      popover.querySelector("[data-cancel-delete-scheme]").addEventListener("click", removeSchemeDeleteConfirm);
+      popover.querySelector("[data-confirm-delete-scheme]").addEventListener("click", () => deleteSavedScheme(scheme.id));
+    }
+
+    function deleteSavedScheme(schemeId) {
+      const schemes = loadSavedSchemes();
+      saveSavedSchemes(schemes.filter((item) => item.id !== schemeId));
+      renderSavedSchemes();
+      saveSchemeStatus.textContent = "方案已删除。";
+    }
+
+    function defaultEquipmentIcon() {
+      return '<svg viewBox="0 0 48 48"><path d="M24 8v32M8 24h32"/><circle cx="24" cy="24" r="15"/></svg>';
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function escapeAttribute(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function renderDeviceVisual(device) {
+      if (device.thumbnailUrl) {
+        return `<img src="${escapeAttribute(device.thumbnailUrl)}" alt="${escapeAttribute(device.label)}" loading="lazy" />`;
+      }
+      return device.icon;
+    }
+
+    function bodyPartLabel(bodyPart) {
+      return {
+        head: "头部",
+        eye: "眼部",
+        ear: "耳部",
+        chest: "胸口",
+        wrist: "手腕",
+        finger: "手指",
+        waist: "腹部/腰部",
+        leg: "膝腿",
+        foot: "脚部"
+      }[bodyPart] || "";
+    }
+
+    function inferUsagePosition(device) {
+      const text = `${device.label || ""} ${device.metrics || ""}`.toLowerCase();
+      if (/头部|头显|头环|head/.test(text)) return "头部";
+      if (/眼部|眼镜|隐形眼镜|lens|eye/.test(text)) return "眼部";
+      if (/耳部|耳塞|耳机|ear/.test(text)) return "耳部";
+      if (/胸口|胸贴|ecg|chest/.test(text)) return "胸口";
+      if (/手腕|手表|腕带|手环|手環|watch|band|wrist/.test(text)) return "手腕";
+      if (/手指|指环|ring/.test(text)) return "手指";
+      if (/腹部|腰部|腰带|胃电|esg|waist/.test(text)) return "腹部/腰部";
+      if (/膝|腿|护膝|knee|leg/.test(text)) return "膝腿";
+      if (/脚|鞋|shoe|foot/.test(text)) return "脚部";
+      return "";
+    }
+
+    function getUsagePositionLabel(device) {
+      return device.usagePositionLabel
+        || device.collectedProduct?.usagePositionLabel
+        || bodyPartLabel(device.collectedProduct?.bodyPart)
+        || inferUsagePosition(device);
+    }
+
+    function getDeviceModel(device) {
+      const model = device.model
+        || device.collectedProduct?.model
+        || device.collectedProduct?.skuId
+        || device.collectedProduct?.specs?.型号
+        || device.collectedProduct?.specs?.model
+        || device.collectedProduct?.specs?.skuId
+        || "";
+      return String(model).replace(/^型号[：:]\s*/, "").trim();
+    }
+
+    function getDeviceValue(device) {
+      const specs = device.collectedProduct?.specs || {};
+      const value = [
+        device.value,
+        device.price,
+        device.collectedProduct?.price,
+        device.collectedProduct?.value,
+        specs.价值,
+        specs.价格,
+        specs.售价,
+        specs.price,
+        specs.Price
+      ].find((item) => item !== undefined && item !== null && String(item).trim());
+      return value === undefined ? "" : String(value).trim();
+    }
+
+    function parseDeviceValueAmount(value) {
+      const text = String(value || "").replace(/,/g, "").trim();
+      if (!text) return 0;
+      const match = text.match(/-?\d+(?:\.\d+)?/);
+      if (!match) return 0;
+      const amount = Number(match[0]) * (/万/.test(text) ? 10000 : 1);
+      return Number.isFinite(amount) ? amount : 0;
+    }
+
+    function formatSystemValue(amount) {
+      return `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)} 元`;
+    }
+
+    function getEquippedDevices() {
+      const devices = getDevices();
+      const selectedDeviceIds = [...new Set(anchors.map((anchor) => anchor.device).filter(Boolean))];
+      return selectedDeviceIds
+        .map((id) => devices.find((device) => device.id === id))
+        .filter(Boolean);
+    }
+
+    const healthDomainRules = [
+      { name: "心肺", pattern: /心肺|心率|心电|心電|ecg|ppg|hrv|呼吸|血氧|spo2|胸口|胸贴|chest/i },
+      { name: "睡眠", pattern: /睡眠|sleep/i },
+      { name: "胃肠", pattern: /胃肠|胃腸|胃电|胃電|esg|消化|腹部|腰部|waist/i },
+      { name: "体温", pattern: /体温|體溫|皮温|皮溫|核心体温|temperature/i },
+      { name: "活动", pattern: /活动|活動|运动|運動|步态|步態|步数|步數|冲击|足压|activity|steps|gait/i },
+      { name: "姿态", pattern: /姿态|姿態|关节|關節|稳定|穩定|posture/i }
+    ];
+
+    function getDeviceEvaluationText(device) {
+      return [
+        device.label,
+        device.subtitle,
+        device.metrics,
+        getUsagePositionLabel(device),
+        ...(device.tags || []),
+        ...getFunctionPoints(device)
+      ].filter(Boolean).join(" ");
+    }
+
+    function getCoveredHealthDomains(equippedDevices) {
+      const covered = new Set();
+      equippedDevices.forEach((device) => {
+        const text = getDeviceEvaluationText(device);
+        healthDomainRules.forEach(({ name, pattern }) => {
+          if (pattern.test(text)) covered.add(name);
+        });
+      });
+      return covered;
+    }
+
+    function formatCoveragePercent(coveredCount) {
+      const percent = Math.round((coveredCount / healthDomainRules.length) * 100);
+      return `${percent}%`;
+    }
+
+    function extractPrecisionScores(text) {
+      let source = String(text || "");
+      const scores = [];
+
+      source = source.replace(/±\s*(\d+(?:\.\d+)?)\s*%/g, (_match, errorRate) => {
+        const score = 100 - Number(errorRate);
+        if (Number.isFinite(score)) scores.push(clamp(score, 0, 100));
+        return " ";
+      });
+
+      source = source.replace(/(\d+(?:\.\d+)?)\s*[-~]\s*(\d+(?:\.\d+)?)\s*%/g, (_match, low, high) => {
+        const score = (Number(low) + Number(high)) / 2;
+        if (Number.isFinite(score)) scores.push(clamp(score, 0, 100));
+        return " ";
+      });
+
+      [...source.matchAll(/(\d+(?:\.\d+)?)\s*%/g)].forEach((match) => {
+        const score = Number(match[1]);
+        if (Number.isFinite(score)) scores.push(clamp(score, 0, 100));
+      });
+
+      return scores;
+    }
+
+    function getPrecisionScores(device) {
+      const collectedMetrics = Array.isArray(device.collectedProduct?.metrics)
+        ? device.collectedProduct.metrics
+        : [device.collectedProduct?.metrics];
+      const candidates = [
+        device.metrics,
+        ...(device.tags || []),
+        ...collectedMetrics,
+        device.collectedProduct?.precision
+      ].filter(Boolean);
+      const precisionScores = candidates
+        .filter((text) => !/覆盖|coverage/i.test(String(text)))
+        .flatMap(extractPrecisionScores);
+      return precisionScores.length ? precisionScores : candidates.flatMap(extractPrecisionScores);
+    }
+
+    function getPrecisionAverage(equippedDevices) {
+      const scores = equippedDevices.flatMap(getPrecisionScores);
+      if (!scores.length) return null;
+      return scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    }
+
+    function gradeFromPrecisionAverage(average) {
+      if (average === null) return "待完善";
+      if (average >= 95) return "A+";
+      if (average >= 90) return "A";
+      if (average >= 85) return "A-";
+      if (average >= 80) return "B+";
+      if (average >= 75) return "B";
+      return "C";
+    }
+
+    function updateEvaluationMetrics(equippedDevices = getEquippedDevices()) {
+      const total = equippedDevices.reduce((sum, device) => sum + parseDeviceValueAmount(getDeviceValue(device)), 0);
+      const valueElement = document.querySelector(".share-metric-value.money");
+      if (valueElement) valueElement.textContent = formatSystemValue(total);
+
+      const coverageElement = document.querySelector(".share-metric-value.coverage");
+      const coverageNote = document.querySelector("[data-coverage-note]");
+      const coveredDomains = getCoveredHealthDomains(equippedDevices);
+      if (coverageElement) coverageElement.textContent = formatCoveragePercent(coveredDomains.size);
+      if (coverageNote) {
+        coverageNote.textContent = `${healthDomainRules.length} 大健康域：${healthDomainRules.map((rule) => rule.name).join("、")}；已覆盖 ${coveredDomains.size} 项。`;
+      }
+
+      const precisionAverage = getPrecisionAverage(equippedDevices);
+      const gradeElement = document.querySelector(".share-metric-value.grade");
+      const gradeNote = document.querySelector("[data-grade-note]");
+      if (gradeElement) gradeElement.textContent = gradeFromPrecisionAverage(precisionAverage);
+      if (gradeNote) {
+        gradeNote.textContent = precisionAverage === null
+          ? "当前装备暂无可解析精度百分比，请在设备详情中补充精度信息。"
+          : `基于当前装备可解析精度百分比的平均值：${Math.round(precisionAverage)}%。`;
+      }
+    }
+
+    function getDeviceProductUrl(device) {
+      return device.productUrl || device.collectedProduct?.sourceUrl || "";
+    }
+
+    function renderEquipmentInfo() {
+      if (!equipmentInfoBody || !equipmentInfoCount) return;
+      const isSnapshotPage = Boolean(window.__SNAPSHOT_STATE__);
+      const equippedIds = new Set(anchors.map((anchor) => anchor.device).filter(Boolean));
+      const allDevices = getAllKnownDevices();
+      const equippedCount = allDevices.filter((device) => equippedIds.has(device.id)).length;
+      equipmentInfoCount.textContent = `${allDevices.length} 个装备 / ${equippedCount} 已加入`;
+      if (!allDevices.length) {
+        equipmentInfoBody.innerHTML = '<div class="equipment-info-empty">暂无装备信息。</div>';
+        return;
+      }
+
+      equipmentInfoBody.innerHTML = `
+        <div class="equipment-info-table-wrap">
+          <table class="equipment-info-table">
+            <thead>
+              <tr>
+                ${isSnapshotPage ? "" : "<th>删除</th>"}
+                <th>缩略图</th>
+                <th>中文名</th>
+                <th>英文名</th>
+                <th>型号</th>
+                <th>价值</th>
+                <th>使用位置</th>
+                <th>网址</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${allDevices.map((device) => {
+                const productUrl = getDeviceProductUrl(device);
+                const isEquipped = equippedIds.has(device.id);
+                return `
+                  <tr>
+                    ${isSnapshotPage ? "" : `<td><button class="delete-equipment-button" type="button" data-delete-info-device="${escapeAttribute(device.id)}" ${isEquipped ? "disabled" : ""} aria-label="${isEquipped ? `已加入方案，不能删除 ${escapeAttribute(device.label)}` : `删除 ${escapeAttribute(device.label)}`}">-</button></td>`}
+                    <td><div class="equipment-info-thumb">${renderDeviceVisual(device)}</div></td>
+                    <td>${escapeHtml(device.label)}</td>
+                    <td>${escapeHtml(device.subtitle || "-")}</td>
+                    <td>${escapeHtml(getDeviceModel(device) || "-")}</td>
+                    <td>${escapeHtml(getDeviceValue(device) || "-")}</td>
+                    <td>${escapeHtml(getUsagePositionLabel(device) || "-")}</td>
+                    <td>${productUrl ? `<a class="equipment-info-url" href="${escapeAttribute(productUrl)}" target="_blank" rel="noreferrer" title="${escapeAttribute(productUrl)}">${escapeHtml(productUrl)}</a>` : "-"}</td>
+                    <td><span class="equipment-info-status ${isEquipped ? "" : "pending"}">${isEquipped ? "已加入" : "待加入"}</span></td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+      equipmentInfoBody.querySelectorAll("[data-delete-info-device]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          deleteAvailableEquipment(button.dataset.deleteInfoDevice);
+        });
+      });
+    }
+
+    function inferFunctionPoints(device) {
+      const text = `${device.label || ""} ${device.metrics || ""} ${(device.tags || []).join(" ")}`.toLowerCase();
+      const points = [];
+      const rules = [
+        [/esg|胃电|胃電/, "ESG"],
+        [/ecg|心电|心電/, "ECG"],
+        [/ppg|光电|光電/, "PPG"],
+        [/spo2|血氧/, "血氧"],
+        [/hrv|心率变异|心率變異/, "HRV"],
+        [/心率|heart rate/, "心率"],
+        [/睡眠|sleep/, "睡眠"],
+        [/运动|活動|活动|步态|步態|activity/, "运动"],
+        [/步数|步數|steps/, "步数"],
+        [/热量|熱量|卡路里|calories/, "热量"],
+        [/体温|體溫|皮温|皮溫|temperature/, "体温"],
+        [/呼吸|respiration|breathing/, "呼吸"],
+        [/姿态|姿態|posture/, "姿态"],
+        [/gps|位置|定位|轨迹|軌跡/, "GPS/位置"],
+        [/压力|壓力|stress/, "压力"],
+        [/眼动|眼動|眨眼/, "眼动"],
+        [/听觉|聽覺|语音|語音/, "听觉/语音"]
+      ];
+      rules.forEach(([pattern, label]) => {
+        if (pattern.test(text)) points.push(label);
+      });
+      return [...new Set(points)];
+    }
+
+    function getFunctionPoints(device) {
+      const points = device.functionPoints || device.collectedProduct?.functionPoints || [];
+      return points.length ? points : inferFunctionPoints(device);
+    }
+
+    function renderFunctionPoints(device) {
+      return getFunctionPoints(device).map((point) => `<span class="tag">${escapeHtml(point)}</span>`).join("");
+    }
+
+    function stringifySpecValue(value) {
+      if (Array.isArray(value)) return value.join(" / ");
+      if (value && typeof value === "object") {
+        return Object.entries(value)
+          .map(([key, nestedValue]) => `${key}: ${stringifySpecValue(nestedValue)}`)
+          .join("；");
+      }
+      return value || "";
+    }
+
+    function renderSpecList(specs) {
+      if (!specs || typeof specs !== "object" || Array.isArray(specs)) {
+        return `<p class="dialog-copy">${escapeHtml(stringifySpecValue(specs) || "暂无规格参数。")}</p>`;
+      }
+      const rows = Object.entries(specs).filter(([, value]) => stringifySpecValue(value));
+      if (!rows.length) return '<p class="dialog-copy">暂无规格参数。</p>';
+      return `
+        <ul class="spec-list">
+          ${rows.map(([key, value]) => `
+            <li>
+              <span class="spec-key">${escapeHtml(key)}</span>
+              <span class="spec-value">${escapeHtml(stringifySpecValue(value))}</span>
+            </li>
+          `).join("")}
+        </ul>
+      `;
+    }
+
+    function getDevices() {
+      const builtInDevices = Array.from(document.querySelectorAll(".device-card[data-device]:not([data-custom-device])")).map((card) => ({
+        id: card.dataset.device,
+        label: card.querySelector(".device-title")?.textContent?.trim() || card.dataset.device,
+        subtitle: card.querySelector(".device-subtitle")?.textContent?.trim() || "",
+        model: card.querySelector(".device-model")?.textContent?.trim() || "",
+        icon: card.querySelector(".icon-box")?.innerHTML || "",
+        metrics: card.querySelector(".device-metrics")?.textContent?.trim() || "",
+        tags: Array.from(card.querySelectorAll(".tag")).map((tag) => tag.textContent.trim()),
+        source: "built-in",
+        card
+      })).map((device) => ({
+        ...device,
+        ...(equipmentOverrides[device.id] || {})
+      })).filter((device) => !deletedEquipmentIds.includes(device.id) && !removedEquipmentIds.includes(device.id));
+      return builtInDevices.concat(
+        customEquipment.map((item) => ({
+          ...item,
+          ...(equipmentOverrides[item.id] || {}),
+          source: "custom",
+          card: document.querySelector(`[data-custom-device][data-device="${CSS.escape(item.id)}"]`) || null
+        })).filter((device) => !deletedEquipmentIds.includes(device.id) && !removedEquipmentIds.includes(device.id))
+      );
+    }
+
+    function getAllKnownDevices() {
+      const builtInDevices = Array.from(document.querySelectorAll(".device-card[data-device]:not([data-custom-device])")).map((card) => ({
+        id: card.dataset.device,
+        label: card.querySelector(".device-title")?.textContent?.trim() || card.dataset.device,
+        subtitle: card.querySelector(".device-subtitle")?.textContent?.trim() || "",
+        model: card.querySelector(".device-model")?.textContent?.trim() || "",
+        icon: card.querySelector(".icon-box")?.innerHTML || "",
+        metrics: card.querySelector(".device-metrics")?.textContent?.trim() || "",
+        tags: Array.from(card.querySelectorAll(".tag")).map((tag) => tag.textContent.trim()),
+        source: "built-in",
+        card
+      })).map((device) => ({
+        ...device,
+        ...(equipmentOverrides[device.id] || {})
+      })).filter((device) => !removedEquipmentIds.includes(device.id));
+      const customDevices = customEquipment.map((item) => ({
+        ...item,
+        ...(equipmentOverrides[item.id] || {}),
+        source: "custom",
+        card: document.querySelector(`[data-custom-device][data-device="${CSS.escape(item.id)}"]`) || null
+      })).filter((device) => !deletedEquipmentIds.includes(device.id) && !removedEquipmentIds.includes(device.id));
+      return builtInDevices.concat(customDevices);
+    }
+
+    function renderCustomDeviceCard(device) {
+      const model = getDeviceModel(device);
+      return `
+        <article class="device-card" data-device="${escapeAttribute(device.id)}" data-custom-device="true">
+          <div class="icon-box">${renderDeviceVisual(device)}</div>
+          <div>
+            <h3 class="device-title">${escapeHtml(device.label)}</h3>
+            <div class="device-subtitle">${escapeHtml(device.subtitle || "Custom Equipment")}</div>
+            <div class="device-model">${model ? `型号：${escapeHtml(model)}` : ""}</div>
+            <div class="device-metrics">${escapeHtml(device.metrics || "自定义装备：请补充监测信息。")}</div>
+            <div class="tags">${(device.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
+          </div>
+        </article>
+      `;
+    }
+
+    function syncCustomDeviceCards() {
+      if (!rightDeviceStack) return;
+      document.querySelectorAll("[data-custom-device]").forEach((card) => card.remove());
+      const equippedIds = new Set(anchors.map((anchor) => anchor.device).filter(Boolean));
+      const visibleCustomDevices = customEquipment
+        .map((item) => ({ ...item, ...(equipmentOverrides[item.id] || {}) }))
+        .filter((device) => equippedIds.has(device.id) && !deletedEquipmentIds.includes(device.id));
+      visibleCustomDevices.forEach((device) => {
+        const template = document.createElement("template");
+        template.innerHTML = renderCustomDeviceCard(device).trim();
+        rightDeviceStack.appendChild(template.content.firstElementChild);
+      });
+    }
+
+    function getDeviceStack(side) {
+      return side === "left" ? leftDeviceStack : rightDeviceStack;
+    }
+
+    function getDeviceCardElement(deviceId) {
+      return document.querySelector(`.device-card[data-device="${CSS.escape(deviceId)}"]`);
+    }
+
+    function getDefaultDeviceSide(deviceId) {
+      return defaultDeviceLayout.left.includes(deviceId) ? "left" : "right";
+    }
+
+    function normalizeDeviceLayout(layout = deviceLayout) {
+      const builtInIds = Array.from(document.querySelectorAll(".device-card[data-device]:not([data-custom-device])"))
+        .map((card) => card.dataset.device);
+      const customIds = customEquipment.map((item) => item.id);
+      const allIds = builtInIds.concat(customIds).filter((id) => !deletedEquipmentIds.includes(id) && !removedEquipmentIds.includes(id));
+      const allIdSet = new Set(allIds);
+      const used = new Set();
+      const normalized = { left: [], right: [] };
+
+      ["left", "right"].forEach((side) => {
+        (layout?.[side] || []).forEach((id) => {
+          if (!allIdSet.has(id) || used.has(id)) return;
+          normalized[side].push(id);
+          used.add(id);
+        });
+      });
+
+      allIds.forEach((id) => {
+        if (used.has(id)) return;
+        normalized[getDefaultDeviceSide(id)].push(id);
+      });
+
+      return normalized;
+    }
+
+    function getStackDeviceIds(stack) {
+      return Array.from(stack.children)
+        .filter((child) => child.matches?.(".device-card[data-device]"))
+        .map((child) => child.dataset.device);
+    }
+
+    function persistDeviceCardLayout() {
+      deviceLayout = {
+        left: getStackDeviceIds(leftDeviceStack),
+        right: getStackDeviceIds(rightDeviceStack)
+      };
+      saveDeviceLayout();
+    }
+
+    function getDragInsertBefore(stack, pointerY) {
+      return Array.from(stack.children)
+        .filter((child) => child.matches?.(".device-card[data-device]") && !child.classList.contains("dragging"))
+        .find((child) => {
+          const rect = child.getBoundingClientRect();
+          return pointerY < rect.top + rect.height / 2;
+        }) || null;
+    }
+
+    function setupDeviceCardDragInteractions() {
+      const isSnapshotPage = Boolean(window.__SNAPSHOT_STATE__);
+      document.querySelectorAll(".device-card[data-device]").forEach((card) => {
+        card.draggable = !isSnapshotPage;
+        card.ondragstart = isSnapshotPage ? null : (event) => {
+          deviceCardDragId = card.dataset.device;
+          card.classList.add("dragging");
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", deviceCardDragId);
+        };
+        card.ondragend = isSnapshotPage ? null : () => {
+          card.classList.remove("dragging");
+          leftDeviceStack.classList.remove("drag-over");
+          rightDeviceStack.classList.remove("drag-over");
+          persistDeviceCardLayout();
+          drawConnections();
+          deviceCardDragId = null;
+        };
+      });
+
+      [leftDeviceStack, rightDeviceStack].forEach((stack) => {
+        stack.ondragover = isSnapshotPage ? null : (event) => {
+          if (!deviceCardDragId) return;
+          event.preventDefault();
+          stack.classList.add("drag-over");
+          const draggingCard = getDeviceCardElement(deviceCardDragId);
+          if (!draggingCard) return;
+          stack.insertBefore(draggingCard, getDragInsertBefore(stack, event.clientY));
+          drawConnections();
+        };
+        stack.ondragleave = isSnapshotPage ? null : (event) => {
+          if (!stack.contains(event.relatedTarget)) stack.classList.remove("drag-over");
+        };
+        stack.ondrop = isSnapshotPage ? null : (event) => {
+          event.preventDefault();
+          stack.classList.remove("drag-over");
+          persistDeviceCardLayout();
+          drawConnections();
+        };
+      });
+    }
+
+    function syncDeviceCardLayout() {
+      syncCustomDeviceCards();
+      deviceLayout = normalizeDeviceLayout(deviceLayout);
+      ["left", "right"].forEach((side) => {
+        const stack = getDeviceStack(side);
+        deviceLayout[side].forEach((id) => {
+          const card = getDeviceCardElement(id);
+          if (card) stack.appendChild(card);
+        });
+      });
+      setupDeviceCardDragInteractions();
+    }
+
+    function syncEquipmentOverrideCards() {
+      Object.entries(equipmentOverrides).forEach(([deviceId, override]) => {
+        const card = Array.from(document.querySelectorAll(".device-card[data-device]"))
+          .find((item) => item.dataset.device === deviceId);
+        if (!card) return;
+        const title = card.querySelector(".device-title");
+        const subtitle = card.querySelector(".device-subtitle");
+        let model = card.querySelector(".device-model");
+        const metrics = card.querySelector(".device-metrics");
+        const tags = card.querySelector(".tags");
+        if (!model) {
+          model = document.createElement("div");
+          model.className = "device-model";
+          subtitle?.insertAdjacentElement("afterend", model);
+        }
+        if (title && override.label) title.textContent = override.label;
+        if (subtitle && override.subtitle !== undefined) subtitle.textContent = override.subtitle;
+        if (model) model.textContent = getDeviceModel(override) ? `型号：${getDeviceModel(override)}` : "";
+        if (metrics && override.metrics !== undefined) metrics.textContent = override.metrics;
+        if (tags && Array.isArray(override.tags)) {
+          tags.innerHTML = override.tags.map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("");
+        }
+      });
+    }
+
+    function syncDeletedDeviceCards() {
+      document.querySelectorAll(".device-card[data-device]").forEach((card) => {
+        card.hidden = deletedEquipmentIds.includes(card.dataset.device) || removedEquipmentIds.includes(card.dataset.device);
+      });
+    }
+
+    function populateDeviceSelect() {
+      const options = ['<option value="">不连接设备</option>']
+        .concat(getDevices().map((device) => `<option value="${device.id}">${device.label}</option>`));
+      dialogDeviceSelect.innerHTML = options.join("");
+    }
+
+    function renderAnchors() {
+      syncDeviceCardLayout();
+      anchorLayer.innerHTML = "";
+      anchors.forEach((anchor) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = `anchor ${anchor.id === selectedAnchorId ? "selected" : ""}`;
+        el.dataset.id = anchor.id;
+        el.dataset.label = anchor.label;
+        el.style.left = `${anchor.x}%`;
+        el.style.top = `${anchor.y}%`;
+        el.setAttribute("aria-label", anchor.label);
+        el.addEventListener("pointerdown", onAnchorPointerDown);
+        el.addEventListener("dblclick", (event) => {
+          event.stopPropagation();
+          showEditAnchorDialog(anchor.id);
+        });
+        el.addEventListener("click", (event) => {
+          event.stopPropagation();
+          selectAnchor(anchor.id);
+        });
+        anchorLayer.appendChild(el);
+      });
+      renderEditor();
+      drawConnections();
+      renderEquipmentSlots();
+    }
+
+    function syncAnchorElements() {
+      syncDeviceCardLayout();
+      anchors.forEach((anchor) => {
+        const el = anchorLayer.querySelector(`[data-id="${anchor.id}"]`);
+        if (!el) return;
+        el.dataset.label = anchor.label;
+        el.style.left = `${anchor.x}%`;
+        el.style.top = `${anchor.y}%`;
+        el.setAttribute("aria-label", anchor.label);
+        el.classList.toggle("selected", anchor.id === selectedAnchorId);
+      });
+      renderEditor();
+      renderEquipmentSlots();
+    }
+
+    function renderEditor() {
+    }
+
+    function selectAnchor(id) {
+      selectedAnchorId = id;
+      renderAnchors();
+    }
+
+    function onAnchorPointerDown(event) {
+      const anchor = anchors.find((item) => item.id === event.currentTarget.dataset.id);
+      if (!anchor) return;
+      event.preventDefault();
+      event.currentTarget.setPointerCapture(event.pointerId);
+      selectedAnchorId = anchor.id;
+      dragState = {
+        id: anchor.id,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        longPressDone: false
+      };
+      window.clearTimeout(longPressTimer);
+      longPressTimer = window.setTimeout(() => {
+        if (!dragState || dragState.id !== anchor.id || dragState.moved) return;
+        dragState.longPressDone = true;
+        showEditAnchorDialog(anchor.id);
+      }, 650);
+      updateAnchorFromPointer(event);
+      event.currentTarget.addEventListener("pointermove", onAnchorPointerMove);
+      event.currentTarget.addEventListener("pointerup", onAnchorPointerUp, { once: true });
+      event.currentTarget.addEventListener("pointercancel", onAnchorPointerUp, { once: true });
+    }
+
+    function onAnchorPointerMove(event) {
+      if (!dragState) return;
+      updateAnchorFromPointer(event);
+    }
+
+    function onAnchorPointerUp(event) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      event.currentTarget.removeEventListener("pointermove", onAnchorPointerMove);
+      window.clearTimeout(longPressTimer);
+      dragState = null;
+      saveAnchors();
+    }
+
+    function updateAnchorFromPointer(event) {
+      const rect = hero.getBoundingClientRect();
+      const anchor = anchors.find((item) => item.id === selectedAnchorId);
+      if (!anchor) return;
+      if (dragState) {
+        const moved = Math.hypot(event.clientX - dragState.startX, event.clientY - dragState.startY);
+        if (moved > 8) {
+          dragState.moved = true;
+          window.clearTimeout(longPressTimer);
+        }
+      }
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+      anchor.x = clamp(x, 2, 98);
+      anchor.y = clamp(y, 6, 96);
+      syncAnchorElements();
+      drawConnections();
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function drawConnections() {
+      const rect = hero.getBoundingClientRect();
+      connectionLayer.setAttribute("viewBox", `0 0 ${rect.width} ${rect.height}`);
+      connectionLayer.innerHTML = "";
+
+      getDevices().forEach(({ card }) => card?.classList.remove("linked"));
+
+      anchors.forEach((anchor) => {
+        if (!anchor.device) return;
+        const device = getDevices().find((item) => item.id === anchor.device);
+        if (!device) return;
+
+        if (!device.card) return;
+        device.card.classList.add("linked");
+        const cardRect = device.card.getBoundingClientRect();
+        const anchorX = (anchor.x / 100) * rect.width;
+        const anchorY = (anchor.y / 100) * rect.height;
+        const cardCenterY = cardRect.top - rect.top + cardRect.height / 2;
+        const cardLeft = cardRect.left - rect.left;
+        const cardRight = cardRect.right - rect.left;
+        const startX = cardLeft + cardRect.width / 2 < anchorX ? cardRight : cardLeft;
+        const startY = cardCenterY;
+        const midX = startX + (anchorX - startX) * 0.52;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("class", "dynamic-line");
+        path.setAttribute("d", `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${anchorY}, ${anchorX} ${anchorY}`);
+        connectionLayer.appendChild(path);
+      });
+    }
+
+    function renderEquipmentSlots() {
+      const selectedDevices = getEquippedDevices();
+      const slotCount = 12;
+
+      equipmentCount.textContent = `${selectedDevices.length} / ${slotCount}`;
+      equipmentGrid.innerHTML = "";
+      updateEvaluationMetrics(selectedDevices);
+      renderEquipmentInfo();
+
+      for (let index = 0; index < slotCount; index += 1) {
+        const device = selectedDevices[index];
+        const slot = document.createElement("div");
+        const model = device ? getDeviceModel(device) : "";
+        slot.className = `equipment-slot ${device ? "filled" : ""} ${model ? "has-model" : ""}`;
+        if (device) {
+        const shortName = device.label.split(" / ")[0];
+        slot.innerHTML = `
+            <div class="slot-icon">${renderDeviceVisual(device)}</div>
+            <div class="slot-name" title="${escapeAttribute(device.label)}">${escapeHtml(shortName)}</div>
+            ${model ? `<div class="slot-model" title="型号：${escapeAttribute(model)}">${escapeHtml(model)}</div>` : ""}
+          `;
+      }
+        equipmentGrid.appendChild(slot);
+      }
+    }
+
+    function openEquipmentPage() {
+      equipmentPage.hidden = false;
+      renderEquipmentPage();
+    }
+
+    function closeEquipmentPage() {
+      equipmentPage.hidden = true;
+    }
+
+    function openEquipmentPickerDialog() {
+      renderEquipmentPickerList();
+      equipmentPickerDialog.hidden = false;
+    }
+
+    function closeEquipmentPickerDialog() {
+      equipmentPickerDialog.hidden = true;
+    }
+
+    function renderEquipmentPickerList() {
+      const equippedIds = new Set(anchors.map((anchor) => anchor.device).filter(Boolean));
+      const devices = getAllKnownDevices();
+      if (!devices.length) {
+        equipmentPickerList.innerHTML = '<div class="equipment-info-empty">暂无可选择装备，请自定义新增。</div>';
+        return;
+      }
+      equipmentPickerList.innerHTML = devices.map((device) => {
+        const isEquipped = equippedIds.has(device.id);
+        const meta = [
+          getDeviceModel(device) ? `型号：${getDeviceModel(device)}` : "",
+          getDeviceValue(device) ? `价值：${getDeviceValue(device)}` : "",
+          getUsagePositionLabel(device) || ""
+        ].filter(Boolean).join(" · ");
+        return `
+          <label class="equipment-picker-option">
+            <input type="checkbox" data-picker-device="${escapeAttribute(device.id)}" ${isEquipped ? "checked disabled" : ""} />
+            <span class="equipment-picker-option-thumb">${renderDeviceVisual(device)}</span>
+            <span>
+              <span class="equipment-picker-option-title">${escapeHtml(device.label)}</span>
+              <span class="equipment-picker-option-meta">${escapeHtml(meta || device.subtitle || "可加入当前方案")}</span>
+            </span>
+          </label>
+        `;
+      }).join("");
+    }
+
+    function addEquipmentToCurrentScheme(deviceId) {
+      if (!deviceId || anchors.some((anchor) => anchor.device === deviceId)) return;
+      deletedEquipmentIds = deletedEquipmentIds.filter((id) => id !== deviceId);
+      saveDeletedEquipmentIds();
+      syncDeletedDeviceCards();
+      const device = getAllKnownDevices().find((item) => item.id === deviceId);
+      if (!device) return;
+      createAnchorForNewEquipment(device);
+    }
+
+    function confirmEquipmentPicker() {
+      const selectedIds = Array.from(equipmentPickerList.querySelectorAll("[data-picker-device]:checked:not(:disabled)"))
+        .map((input) => input.dataset.pickerDevice);
+      selectedIds.forEach(addEquipmentToCurrentScheme);
+      populateDeviceSelect();
+      renderEquipmentPage();
+      renderAnchors();
+      closeEquipmentPickerDialog();
+    }
+
+    function openCustomEquipmentFromPicker() {
+      closeEquipmentPickerDialog();
+      openEquipmentDialog();
+    }
+
+    function setEquipmentView(mode) {
+      equipmentViewMode = mode;
+      fullEquipmentViewButton.classList.toggle("active", mode === "full");
+      cardEquipmentViewButton.classList.toggle("active", mode === "cards");
+      renderEquipmentPage();
+    }
+
+    function renderEquipmentTags(device) {
+      return (device.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("");
+    }
+
+    function bindEquipmentPageInteractions() {
+      equipmentPageBody.querySelectorAll("[data-preview-device]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          openEquipmentPreview(button.dataset.previewDevice);
+        });
+      });
+
+      equipmentPageBody.querySelectorAll("[data-delete-device]").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.stopPropagation();
+          deleteEquipment(button.dataset.deleteDevice);
+        });
+      });
+
+      equipmentPageBody.querySelectorAll("[data-detail-device]").forEach((item) => {
+        item.addEventListener("click", () => openEquipmentDetail(item.dataset.detailDevice));
+        item.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openEquipmentDetail(item.dataset.detailDevice);
+          }
+        });
+      });
+    }
+
+    function renderEquipmentPage() {
+      const devices = getEquippedDevices();
+      const isSnapshotPage = Boolean(window.__SNAPSHOT_STATE__);
+      addEquipmentButton.hidden = isSnapshotPage || equipmentViewMode === "cards";
+      if (equipmentViewMode === "cards") {
+        equipmentPageBody.innerHTML = `
+          <div class="equipment-library-grid">
+            ${devices.map((device) => `
+              <article class="equipment-library-card" data-detail-device="${escapeAttribute(device.id)}" tabindex="0">
+                <div class="card-top">
+                  <button class="thumbnail-button" type="button" data-preview-device="${escapeAttribute(device.id)}" aria-label="查看 ${escapeAttribute(device.label)} 大图">
+                    <div class="library-icon">${renderDeviceVisual(device)}</div>
+                  </button>
+                  <div>
+                    <h3>${escapeHtml(device.label)}</h3>
+                    <div class="english">${escapeHtml(device.subtitle)}</div>
+                    ${getDeviceModel(device) ? `<div class="model">型号：${escapeHtml(getDeviceModel(device))}</div>` : ""}
+                  </div>
+                </div>
+                <p>${escapeHtml(device.metrics)}</p>
+                <p>${escapeHtml(getUsagePositionLabel(device))}${getFunctionPoints(device).length ? ` · ${escapeHtml(getFunctionPoints(device).join(" / "))}` : ""}</p>
+                <div class="library-tags">
+                  ${renderFunctionPoints(device) || renderEquipmentTags(device)}
+                </div>
+              </article>
+            `).join("")}
+            ${isSnapshotPage ? "" : `<button id="addEquipmentCard" class="equipment-library-card add-equipment-card" type="button">
+              <span class="add-card-plus">+</span>
+              <span>新增装备</span>
+            </button>`}
+          </div>
+        `;
+        document.getElementById("addEquipmentCard")?.addEventListener("click", openEquipmentPickerDialog);
+        bindEquipmentPageInteractions();
+        return;
+      }
+
+      equipmentPageBody.innerHTML = `
+        <div class="equipment-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                ${isSnapshotPage ? "" : "<th>删除</th>"}
+                <th>缩略图</th>
+                <th>中文名</th>
+                <th>英文名</th>
+                <th>型号</th>
+                <th>价值</th>
+                <th>使用位置</th>
+                <th>检测功能点</th>
+                <th>完整信息</th>
+                <th>精度 / 覆盖</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${devices.map((device) => `
+                <tr class="equipment-table-row" data-detail-device="${escapeAttribute(device.id)}" tabindex="0">
+                  ${isSnapshotPage ? "" : `<td><button class="delete-equipment-button" type="button" data-delete-device="${escapeAttribute(device.id)}" aria-label="删除 ${escapeAttribute(device.label)}">-</button></td>`}
+                  <td>
+                    <button class="thumbnail-button" type="button" data-preview-device="${escapeAttribute(device.id)}" aria-label="查看 ${escapeAttribute(device.label)} 大图">
+                      <div class="library-icon">${renderDeviceVisual(device)}</div>
+                    </button>
+                  </td>
+                  <td>${escapeHtml(device.label)}</td>
+                  <td>${escapeHtml(device.subtitle)}</td>
+                  <td>${escapeHtml(getDeviceModel(device) || "-")}</td>
+                  <td>${escapeHtml(getDeviceValue(device) || "-")}</td>
+                  <td>${escapeHtml(getUsagePositionLabel(device))}</td>
+                  <td>${escapeHtml(getFunctionPoints(device).join(" / "))}</td>
+                  <td>${escapeHtml(device.metrics)}</td>
+                  <td>${escapeHtml((device.tags || []).join(" / "))}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+      bindEquipmentPageInteractions();
+    }
+
+    function getDeviceById(deviceId) {
+      return getDevices().find((device) => device.id === deviceId);
+    }
+
+    function closeEquipmentPreview() {
+      equipmentPreviewDialog.hidden = true;
+    }
+
+    function closeEquipmentDetail() {
+      equipmentDetailDialog.hidden = true;
+      activeDetailDeviceId = null;
+      if (!window.__SNAPSHOT_STATE__) {
+        saveEquipmentDetailButton.hidden = false;
+        deleteEquipmentDetailButton.hidden = false;
+      }
+    }
+
+    function openEquipmentPreview(deviceId) {
+      const device = getDeviceById(deviceId);
+      if (!device) return;
+      equipmentPreviewTitle.textContent = `${device.label} 大图`;
+      equipmentPreviewVisual.innerHTML = renderDeviceVisual(device);
+      equipmentPreviewDialog.hidden = false;
+    }
+
+    function normalizeDetailValue(value) {
+      if (Array.isArray(value)) return value.join(" / ");
+      if (value && typeof value === "object") return JSON.stringify(value, null, 2);
+      return value || "";
+    }
+
+    function renderEditableDetailField(label, field, value, multiline = false) {
+      const normalized = normalizeDetailValue(value);
+      const control = multiline
+        ? `<textarea data-detail-field="${escapeAttribute(field)}">${escapeHtml(normalized)}</textarea>`
+        : `<input data-detail-field="${escapeAttribute(field)}" type="text" value="${escapeAttribute(normalized)}" />`;
+      return `
+        <div class="dialog-field">
+          <label>${escapeHtml(label)}</label>
+          ${control}
+        </div>
+      `;
+    }
+
+    function renderReadonlyDetailField(label, value) {
+      const normalized = normalizeDetailValue(value);
+      return normalized ? `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(normalized)}</dd>` : "";
+    }
+
+    function renderSpecDetailField(specs) {
+      return `
+        <div class="dialog-field">
+          <label>规格参数</label>
+          ${renderSpecList(specs)}
+          <textarea data-detail-field="specs" hidden>${escapeHtml(normalizeDetailValue(specs))}</textarea>
+        </div>
+      `;
+    }
+
+    function getDetailFieldValue(field) {
+      return equipmentDetailBody.querySelector(`[data-detail-field="${field}"]`)?.value.trim() || "";
+    }
+
+    function splitDetailList(value) {
+      return value
+        .split(/[\/\n,，]+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function parseDetailObject(value) {
+      if (!value) return undefined;
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        return value;
+      }
+    }
+
+    function openReadonlyEquipmentDetail(device, collected) {
+      equipmentDetailBody.innerHTML = `
+        <div class="equipment-preview-visual">${renderDeviceVisual(device)}</div>
+        <dl class="equipment-detail-grid">
+          <dt>设备 ID</dt><dd>${escapeHtml(device.id)}</dd>
+          <dt>来源</dt><dd>${device.source === "custom" ? "新增装备" : "系统内置"}</dd>
+          ${renderReadonlyDetailField("中文名", device.label)}
+          ${renderReadonlyDetailField("英文名", device.subtitle)}
+          ${renderReadonlyDetailField("使用位置", getUsagePositionLabel(device))}
+          ${renderReadonlyDetailField("检测功能点", getFunctionPoints(device))}
+          ${renderReadonlyDetailField("完整信息", device.metrics)}
+          ${renderReadonlyDetailField("精度 / 覆盖", device.tags || [])}
+          ${renderReadonlyDetailField("产品网址", device.productUrl || collected.sourceUrl)}
+          ${renderReadonlyDetailField("图片地址", device.thumbnailUrl || collected.imageUrl)}
+          ${renderReadonlyDetailField("品牌", collected.brand)}
+          ${renderReadonlyDetailField("型号", getDeviceModel(device))}
+          ${renderReadonlyDetailField("价值", getDeviceValue(device) || "-")}
+          ${renderReadonlyDetailField("设备类型", collected.deviceType)}
+          ${renderReadonlyDetailField("监测部位", collected.bodyPart)}
+          ${renderReadonlyDetailField("抓取置信度", collected.confidence)}
+          ${renderReadonlyDetailField("抓取提醒", collected.warnings || [])}
+        </dl>
+        <div class="dialog-field">
+          <label>规格参数</label>
+          ${renderSpecList(collected.specs)}
+        </div>
+      `;
+    }
+
+    function openEquipmentDetail(deviceId) {
+      const device = getDeviceById(deviceId);
+      if (!device) return;
+      const collected = device.collectedProduct || {};
+      activeDetailDeviceId = device.id;
+      equipmentDetailTitle.textContent = device.label;
+      if (window.__SNAPSHOT_STATE__) {
+        openReadonlyEquipmentDetail(device, collected);
+        saveEquipmentDetailButton.hidden = true;
+        deleteEquipmentDetailButton.hidden = true;
+        equipmentDetailDialog.hidden = false;
+        return;
+      }
+      saveEquipmentDetailButton.hidden = false;
+      deleteEquipmentDetailButton.hidden = false;
+      equipmentDetailBody.innerHTML = `
+        <div class="equipment-preview-visual">${renderDeviceVisual(device)}</div>
+        <dl class="equipment-detail-grid">
+          <dt>设备 ID</dt><dd>${escapeHtml(device.id)}</dd>
+          <dt>来源</dt><dd>${device.source === "custom" ? "新增装备" : "系统内置"}</dd>
+        </dl>
+        ${renderEditableDetailField("中文名", "label", device.label)}
+        ${renderEditableDetailField("英文名", "subtitle", device.subtitle)}
+        ${renderEditableDetailField("使用位置", "usagePositionLabel", getUsagePositionLabel(device))}
+        ${renderEditableDetailField("检测功能点", "functionPoints", getFunctionPoints(device), true)}
+        ${renderEditableDetailField("完整信息", "metrics", device.metrics, true)}
+        ${renderEditableDetailField("精度 / 覆盖", "tags", device.tags || [], true)}
+        ${renderEditableDetailField("产品网址", "productUrl", device.productUrl || collected.sourceUrl)}
+        ${renderEditableDetailField("图片地址", "thumbnailUrl", device.thumbnailUrl || collected.imageUrl)}
+        ${renderEditableDetailField("品牌", "brand", collected.brand)}
+        ${renderEditableDetailField("型号", "model", getDeviceModel(device))}
+        ${renderEditableDetailField("价值", "value", getDeviceValue(device))}
+        ${renderEditableDetailField("设备类型", "deviceType", collected.deviceType)}
+        ${renderEditableDetailField("监测部位", "bodyPart", collected.bodyPart)}
+        ${renderSpecDetailField(collected.specs)}
+        ${renderEditableDetailField("抓取置信度", "confidence", collected.confidence)}
+        ${renderEditableDetailField("抓取提醒", "warnings", collected.warnings || [], true)}
+        <div id="equipmentDetailStatus" class="fetch-status" aria-live="polite"></div>
+      `;
+      equipmentDetailDialog.hidden = false;
+    }
+
+    function buildEditedEquipmentData() {
+      const productUrl = getDetailFieldValue("productUrl");
+      const thumbnailUrl = getDetailFieldValue("thumbnailUrl");
+      const usagePositionLabel = getDetailFieldValue("usagePositionLabel");
+      const functionPoints = splitDetailList(getDetailFieldValue("functionPoints"));
+      const value = getDetailFieldValue("value");
+      return {
+        label: getDetailFieldValue("label") || "未命名设备",
+        subtitle: getDetailFieldValue("subtitle"),
+        model: getDetailFieldValue("model"),
+        value,
+        usagePositionLabel,
+        functionPoints,
+        metrics: getDetailFieldValue("metrics"),
+        tags: splitDetailList(getDetailFieldValue("tags")),
+        productUrl,
+        thumbnailUrl,
+        collectedProduct: {
+          sourceUrl: productUrl,
+          brand: getDetailFieldValue("brand"),
+          model: getDetailFieldValue("model"),
+          price: value,
+          deviceType: getDetailFieldValue("deviceType"),
+          bodyPart: getDetailFieldValue("bodyPart"),
+          usagePositionLabel,
+          functionPoints,
+          imageUrl: thumbnailUrl,
+          specs: parseDetailObject(getDetailFieldValue("specs")),
+          confidence: getDetailFieldValue("confidence"),
+          warnings: splitDetailList(getDetailFieldValue("warnings"))
+        }
+      };
+    }
+
+    function saveEquipmentDetail() {
+      if (!activeDetailDeviceId) return;
+      const device = getDeviceById(activeDetailDeviceId);
+      if (!device) return;
+      const edited = buildEditedEquipmentData();
+
+      if (device.source === "custom") {
+        customEquipment = customEquipment.map((item) => (
+          item.id === activeDetailDeviceId ? { ...item, ...edited } : item
+        ));
+        saveCustomEquipment();
+      } else {
+        equipmentOverrides = {
+          ...equipmentOverrides,
+          [activeDetailDeviceId]: edited
+        };
+        saveEquipmentOverrides();
+        syncEquipmentOverrideCards();
+      }
+
+      populateDeviceSelect();
+      renderEquipmentPage();
+      renderEquipmentSlots();
+      renderAnchors();
+      equipmentDetailTitle.textContent = edited.label;
+      const status = document.getElementById("equipmentDetailStatus");
+      if (status) status.textContent = "已保存修改。";
+    }
+
+    function deleteEquipment(deviceId) {
+      const device = getDeviceById(deviceId);
+      if (!device) return;
+
+      if (device.source === "custom") {
+        customEquipment = customEquipment.filter((item) => item.id !== deviceId);
+        saveCustomEquipment();
+      } else {
+        deletedEquipmentIds = [...new Set(deletedEquipmentIds.concat(deviceId))];
+        saveDeletedEquipmentIds();
+        syncDeletedDeviceCards();
+      }
+      delete equipmentOverrides[deviceId];
+      saveEquipmentOverrides();
+
+      anchors = anchors.map((anchor) => (
+        anchor.device === deviceId ? { ...anchor, device: "" } : anchor
+      ));
+      saveAnchors();
+      populateDeviceSelect();
+      renderEquipmentPage();
+      renderAnchors();
+    }
+
+    function deleteAvailableEquipment(deviceId) {
+      if (!deviceId || anchors.some((anchor) => anchor.device === deviceId)) return;
+      const device = getAllKnownDevices().find((item) => item.id === deviceId);
+      if (!device) return;
+
+      if (device.source === "custom") {
+        customEquipment = customEquipment.filter((item) => item.id !== deviceId);
+        saveCustomEquipment();
+      } else {
+        removedEquipmentIds = [...new Set(removedEquipmentIds.concat(deviceId))];
+        saveRemovedEquipmentIds();
+        syncDeletedDeviceCards();
+      }
+      delete equipmentOverrides[deviceId];
+      equipmentOverrides = { ...equipmentOverrides };
+      saveEquipmentOverrides();
+      deviceLayout = {
+        left: deviceLayout.left.filter((id) => id !== deviceId),
+        right: deviceLayout.right.filter((id) => id !== deviceId)
+      };
+      saveDeviceLayout();
+      populateDeviceSelect();
+      renderEquipmentPage();
+      renderAnchors();
+    }
+
+    function deleteActiveEquipmentDetail() {
+      if (!activeDetailDeviceId) return;
+      const deletingId = activeDetailDeviceId;
+      closeEquipmentDetail();
+      deleteEquipment(deletingId);
+    }
+
+    function openEquipmentDialog() {
+      latestCollectedProduct = null;
+      newEquipmentUrl.value = "";
+      newEquipmentName.value = "";
+      newEquipmentEnglish.value = "";
+      newEquipmentModel.value = "";
+      newEquipmentValue.value = "";
+      newEquipmentUsage.value = "";
+      newEquipmentFunctionPoints.value = "";
+      equipmentFetchStatus.textContent = "";
+      equipmentDialog.hidden = false;
+      newEquipmentName.focus();
+    }
+
+    function closeEquipmentDialog() {
+      equipmentDialog.hidden = true;
+    }
+
+    function extractJdSkuFromUrl(url) {
+      try {
+        const parsed = new URL(url);
+        if (!/(^|\.)jd\.com$/i.test(parsed.hostname)) return "";
+        return parsed.pathname.match(/^\/(\d+)(?:\.html)?\/?$/i)?.[1] || "";
+      } catch (error) {
+        return "";
+      }
+    }
+
+    function buildJdUrlFallback(url) {
+      const skuId = extractJdSkuFromUrl(url);
+      if (!skuId) return null;
+      return {
+        sourceUrl: url,
+        sourceType: "commerce",
+        brand: "京东",
+        model: skuId,
+        skuId,
+        nameZh: `京东商品 ${skuId}`,
+        nameEn: `JD Product ${skuId}`,
+        deviceType: "other",
+        bodyPart: "unknown",
+        usagePositionLabel: "未知位置",
+        metrics: [],
+        functionPoints: [],
+        coverage: `京东商品 SKU ${skuId}`,
+        precision: "京东页面可能触发验证，已从网址提取 SKU，商品详情可手动补充。",
+        price: null,
+        currency: null,
+        imageUrl: null,
+        purchaseUrl: `https://item.jd.com/${skuId}.html`,
+        specs: { skuId },
+        confidence: { overall: 0.25, fields: {} },
+        warnings: ["京东页面可能触发验证，已先按 SKU 建立装备草稿。"]
+      };
+    }
+
+    function applyCollectedProduct(result) {
+      latestCollectedProduct = result;
+      newEquipmentName.value = result.nameZh || newEquipmentName.value;
+      newEquipmentEnglish.value = result.nameEn || newEquipmentEnglish.value;
+      newEquipmentModel.value = result.model || result.skuId || newEquipmentModel.value;
+      newEquipmentValue.value = result.price || newEquipmentValue.value;
+      newEquipmentUsage.value = result.usagePositionLabel || bodyPartLabel(result.bodyPart) || newEquipmentUsage.value;
+      newEquipmentFunctionPoints.value = (result.functionPoints || []).join(" / ") || newEquipmentFunctionPoints.value;
+    }
+
+    function setFetchButtonsDisabled(disabled) {
+      fetchEquipmentInfoButton.disabled = disabled;
+      openProductBrowserButton.disabled = disabled;
+      collectBrowserProductButton.disabled = disabled;
+    }
+
+    async function fetchEquipmentInfo() {
+      const url = newEquipmentUrl.value.trim();
+      if (!url) {
+        equipmentFetchStatus.textContent = "请先输入产品网址。";
+        newEquipmentUrl.focus();
+        return;
+      }
+
+      setFetchButtonsDisabled(true);
+      equipmentFetchStatus.textContent = "正在抓取产品信息...";
+
+      try {
+        const response = await fetch("/api/collect-product", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        const result = await response.json();
+
+        if (!response.ok) {
+          const jdFallback = buildJdUrlFallback(url);
+          if (jdFallback) {
+            applyCollectedProduct(jdFallback);
+            equipmentFetchStatus.textContent = `已识别京东 SKU：${jdFallback.skuId}。页面详情受验证限制，可先保存后手动补充。`;
+            return;
+          }
+          equipmentFetchStatus.textContent = result.message || "抓取失败，请手动填写。";
+          return;
+        }
+
+        applyCollectedProduct(result);
+
+        equipmentFetchStatus.textContent = result.warnings?.length
+          ? `已抓取，部分字段需确认：${result.warnings[0]}`
+          : "已抓取并回填产品信息。";
+      } catch (error) {
+        console.warn("Equipment fetch failed:", error);
+        const jdFallback = buildJdUrlFallback(url);
+        if (jdFallback) {
+          applyCollectedProduct(jdFallback);
+          equipmentFetchStatus.textContent = `抓取服务不可用，但已识别京东 SKU：${jdFallback.skuId}。`;
+          return;
+        }
+        equipmentFetchStatus.textContent = "抓取服务不可用，请确认后端已启动，或手动填写。";
+      } finally {
+        setFetchButtonsDisabled(false);
+      }
+    }
+
+    async function openProductInBrowser() {
+      const url = newEquipmentUrl.value.trim();
+      if (!url) {
+        equipmentFetchStatus.textContent = "请先输入产品网址。";
+        newEquipmentUrl.focus();
+        return;
+      }
+
+      setFetchButtonsDisabled(true);
+      equipmentFetchStatus.textContent = "正在打开浏览器，请在打开的页面完成登录或验证...";
+
+      try {
+        const response = await fetch("/api/browser/open-product", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          equipmentFetchStatus.textContent = result.message || "无法打开浏览器辅助抓取。";
+          return;
+        }
+        equipmentFetchStatus.textContent = result.message || "已打开浏览器。登录或完成验证后点击“登录后抓取”。";
+      } catch (error) {
+        console.warn("Browser open failed:", error);
+        equipmentFetchStatus.textContent = "无法打开浏览器辅助抓取，请确认后端已启动并安装 Playwright。";
+      } finally {
+        setFetchButtonsDisabled(false);
+      }
+    }
+
+    async function collectProductFromBrowser() {
+      setFetchButtonsDisabled(true);
+      equipmentFetchStatus.textContent = "正在从已登录浏览器页面读取商品信息...";
+
+      try {
+        const response = await fetch("/api/browser/collect-current", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({})
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          equipmentFetchStatus.textContent = result.message || "浏览器页面仍无法识别商品信息。";
+          return;
+        }
+        applyCollectedProduct(result);
+        equipmentFetchStatus.textContent = result.warnings?.length
+          ? `已从浏览器读取，部分字段需确认：${result.warnings[0]}`
+          : "已从浏览器页面读取并回填产品信息。";
+      } catch (error) {
+        console.warn("Browser collect failed:", error);
+        equipmentFetchStatus.textContent = "浏览器辅助抓取失败，请确认商品页已打开并完成验证。";
+      } finally {
+        setFetchButtonsDisabled(false);
+      }
+    }
+
+    function addCustomEquipment() {
+      const label = newEquipmentName.value.trim();
+      if (!label) {
+        newEquipmentName.focus();
+        return;
+      }
+      const id = `custom-${Date.now()}`;
+      const manualFunctionPoints = splitDetailList(newEquipmentFunctionPoints.value);
+      const functionPoints = manualFunctionPoints.length ? manualFunctionPoints : latestCollectedProduct?.functionPoints || [];
+      const equipment = {
+        id,
+        label,
+        subtitle: newEquipmentEnglish.value.trim() || "Custom Equipment",
+        model: newEquipmentModel.value.trim() || latestCollectedProduct?.model || latestCollectedProduct?.skuId || "",
+        value: newEquipmentValue.value.trim() || latestCollectedProduct?.price || "",
+        icon: defaultEquipmentIcon(),
+        thumbnailUrl: latestCollectedProduct?.imageUrl || "",
+        usagePositionLabel: newEquipmentUsage.value.trim() || latestCollectedProduct?.usagePositionLabel || "",
+        functionPoints,
+        productUrl: newEquipmentUrl.value.trim(),
+        metrics: "自定义装备：请在完整信息页补充监测信息。",
+        tags: [],
+        collectedProduct: latestCollectedProduct ? {
+          sourceUrl: latestCollectedProduct.sourceUrl,
+          brand: latestCollectedProduct.brand,
+          model: newEquipmentModel.value.trim() || latestCollectedProduct.model,
+          price: newEquipmentValue.value.trim() || latestCollectedProduct.price,
+          deviceType: latestCollectedProduct.deviceType,
+          bodyPart: latestCollectedProduct.bodyPart,
+          usagePositionLabel: newEquipmentUsage.value.trim() || latestCollectedProduct.usagePositionLabel,
+          functionPoints,
+          imageUrl: latestCollectedProduct.imageUrl,
+          specs: latestCollectedProduct.specs,
+          confidence: latestCollectedProduct.confidence,
+          warnings: latestCollectedProduct.warnings
+        } : null
+      };
+      customEquipment.push(equipment);
+      saveCustomEquipment();
+      createAnchorForNewEquipment(equipment);
+      populateDeviceSelect();
+      renderEquipmentPage();
+      renderEquipmentSlots();
+      closeEquipmentDialog();
+      latestCollectedProduct = null;
+    }
+
+    function createAnchorAtEvent(event) {
+      const rect = hero.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+      showAddAnchorDialog(x, y);
+    }
+
+    function getNextEquipmentAnchorPosition() {
+      const occupied = new Set(anchors.map((anchor) => `${Math.round(anchor.x)}:${Math.round(anchor.y)}`));
+      const positions = [
+        { x: 63, y: 22 },
+        { x: 63, y: 34 },
+        { x: 63, y: 46 },
+        { x: 63, y: 58 },
+        { x: 63, y: 70 },
+        { x: 37, y: 22 },
+        { x: 37, y: 34 },
+        { x: 37, y: 46 },
+        { x: 37, y: 58 },
+        { x: 37, y: 70 }
+      ];
+      return positions.find((position) => !occupied.has(`${position.x}:${position.y}`)) || {
+        x: 63,
+        y: clamp(22 + anchors.length * 6, 18, 88)
+      };
+    }
+
+    function createAnchorForNewEquipment(equipment) {
+      const position = getNextEquipmentAnchorPosition();
+      const label = equipment.usagePositionLabel || equipment.label.split(" / ")[0] || "新增装备";
+      createAnchorAt(position.x, position.y, label, equipment.id);
+    }
+
+    function createAnchorAt(x, y, label, device) {
+      const id = `anchor-${Date.now()}`;
+      anchors.push({
+        id,
+        label: label || "新锚点",
+        x: clamp(x, 2, 98),
+        y: clamp(y, 6, 96),
+        device: device || ""
+      });
+      selectedAnchorId = id;
+      renderAnchors();
+      saveAnchors();
+    }
+
+    function showAddAnchorDialog(x, y) {
+      pendingAnchorPosition = { x, y };
+      pendingEditAnchorId = null;
+      dialogMode = "add";
+      dialogTitle.textContent = "新增锚点";
+      dialogCopy.textContent = "确认在当前位置新增锚点，并可先填写中文说明与对应智能设备框。";
+      dialogLabelField.hidden = false;
+      dialogDeviceField.hidden = false;
+      dialogLabelInput.value = "新锚点";
+      dialogDeviceSelect.value = "";
+      dialogDeleteButton.hidden = true;
+      confirmDialogButton.textContent = "新增";
+      actionDialog.hidden = false;
+      dialogLabelInput.focus();
+      dialogLabelInput.select();
+    }
+
+    function showEditAnchorDialog(anchorId) {
+      const anchor = anchors.find((item) => item.id === anchorId);
+      if (!anchor) return;
+      selectedAnchorId = anchor.id;
+      syncAnchorElements();
+      pendingAnchorPosition = null;
+      pendingEditAnchorId = anchor.id;
+      dialogMode = "edit";
+      dialogTitle.textContent = "编辑锚点";
+      dialogCopy.textContent = "修改当前锚点的中文说明和对应智能设备框。";
+      dialogLabelField.hidden = false;
+      dialogDeviceField.hidden = false;
+      dialogLabelInput.value = anchor.label;
+      dialogDeviceSelect.value = anchor.device || "";
+      dialogDeleteButton.hidden = false;
+      confirmDialogButton.textContent = "保存";
+      actionDialog.hidden = false;
+      dialogLabelInput.focus();
+      dialogLabelInput.select();
+    }
+
+    function showDeleteDialog() {
+      const selected = anchors.find((anchor) => anchor.id === selectedAnchorId);
+      if (!selected) return;
+      dialogMode = "delete";
+      pendingAnchorPosition = null;
+      pendingEditAnchorId = selected.id;
+      dialogTitle.textContent = "删除锚点";
+      dialogCopy.textContent = `确认删除“${selected.label}”？删除后与设备框的连接线也会一起移除。`;
+      dialogLabelField.hidden = true;
+      dialogDeviceField.hidden = true;
+      dialogDeleteButton.hidden = true;
+      confirmDialogButton.textContent = "确认删除";
+      actionDialog.hidden = false;
+      confirmDialogButton.focus();
+    }
+
+    function closeDialog() {
+      actionDialog.hidden = true;
+      dialogMode = null;
+      pendingAnchorPosition = null;
+      pendingEditAnchorId = null;
+    }
+
+    function confirmDialog() {
+      if (dialogMode === "add" && pendingAnchorPosition) {
+        createAnchorAt(
+          pendingAnchorPosition.x,
+          pendingAnchorPosition.y,
+          dialogLabelInput.value.trim() || "新锚点",
+          dialogDeviceSelect.value
+        );
+        closeDialog();
+        return;
+      }
+      if (dialogMode === "edit" && pendingEditAnchorId) {
+        const anchor = anchors.find((item) => item.id === pendingEditAnchorId);
+        if (!anchor) return;
+        anchor.label = dialogLabelInput.value.trim() || "未命名锚点";
+        anchor.device = dialogDeviceSelect.value;
+        selectedAnchorId = anchor.id;
+        renderAnchors();
+        saveAnchors();
+        closeDialog();
+        return;
+      }
+      if (dialogMode === "delete") {
+        deleteSelectedAnchor();
+        closeDialog();
+      }
+    }
+
+    function shouldCreateAnchorFromEvent(event) {
+      return !event.target.closest(".device-card, .anchor, button, input, select, .title-band, section");
+    }
+
+    function startLongPress(event) {
+      if (!shouldCreateAnchorFromEvent(event)) return;
+      longPressStart = { x: event.clientX, y: event.clientY };
+      window.clearTimeout(longPressTimer);
+      longPressTimer = window.setTimeout(() => {
+        createAnchorAtEvent(event);
+        longPressTimer = null;
+        longPressStart = null;
+      }, 650);
+    }
+
+    function cancelLongPress() {
+      window.clearTimeout(longPressTimer);
+      longPressTimer = null;
+      longPressStart = null;
+    }
+
+    function moveLongPress(event) {
+      if (!longPressStart) return;
+      const moved = Math.hypot(event.clientX - longPressStart.x, event.clientY - longPressStart.y);
+      if (moved > 8) cancelLongPress();
+    }
+
+    function deleteSelectedAnchor() {
+      anchors = anchors.filter((anchor) => anchor.id !== selectedAnchorId);
+      selectedAnchorId = anchors[0]?.id || null;
+      renderAnchors();
+      saveAnchors();
+    }
+
+    dialogDeleteButton.addEventListener("click", showDeleteDialog);
+    cancelDialogButton.addEventListener("click", closeDialog);
+    confirmDialogButton.addEventListener("click", confirmDialog);
+    openEquipmentPageButton.addEventListener("click", openEquipmentPage);
+    closeEquipmentPageButton.addEventListener("click", closeEquipmentPage);
+    fullEquipmentViewButton.addEventListener("click", () => setEquipmentView("full"));
+    cardEquipmentViewButton.addEventListener("click", () => setEquipmentView("cards"));
+    addEquipmentButton.addEventListener("click", openEquipmentPickerDialog);
+    cancelEquipmentPickerButton.addEventListener("click", closeEquipmentPickerDialog);
+    confirmEquipmentPickerButton.addEventListener("click", confirmEquipmentPicker);
+    customEquipmentFromPickerButton.addEventListener("click", openCustomEquipmentFromPicker);
+    addEquipmentFromInfoButton?.addEventListener("click", openEquipmentDialog);
+    fetchEquipmentInfoButton.addEventListener("click", fetchEquipmentInfo);
+    openProductBrowserButton.addEventListener("click", openProductInBrowser);
+    collectBrowserProductButton.addEventListener("click", collectProductFromBrowser);
+    cancelEquipmentDialogButton.addEventListener("click", closeEquipmentDialog);
+    confirmEquipmentDialogButton.addEventListener("click", addCustomEquipment);
+    closeEquipmentPreviewButton.addEventListener("click", closeEquipmentPreview);
+    closeEquipmentDetailButton.addEventListener("click", closeEquipmentDetail);
+    saveEquipmentDetailButton.addEventListener("click", saveEquipmentDetail);
+    deleteEquipmentDetailButton.addEventListener("click", deleteActiveEquipmentDetail);
+    shareLinkButton?.addEventListener("click", shareLink);
+    shareImageButton?.addEventListener("click", shareImage);
+    saveSchemeButton?.addEventListener("click", openSchemeNameDialog);
+    cancelSchemeNameButton.addEventListener("click", closeSchemeNameDialog);
+    confirmSchemeNameButton.addEventListener("click", confirmSchemeNameDialog);
+    schemeNameInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") confirmSchemeNameDialog();
+    });
+    equipmentPage.addEventListener("click", (event) => {
+      if (event.target === equipmentPage) closeEquipmentPage();
+    });
+    equipmentDialog.addEventListener("click", (event) => {
+      if (event.target === equipmentDialog) closeEquipmentDialog();
+    });
+    equipmentPickerDialog.addEventListener("click", (event) => {
+      if (event.target === equipmentPickerDialog) closeEquipmentPickerDialog();
+    });
+    equipmentPreviewDialog.addEventListener("click", (event) => {
+      if (event.target === equipmentPreviewDialog) closeEquipmentPreview();
+    });
+    equipmentDetailDialog.addEventListener("click", (event) => {
+      if (event.target === equipmentDetailDialog) closeEquipmentDetail();
+    });
+    schemeNameDialog.addEventListener("click", (event) => {
+      if (event.target === schemeNameDialog) closeSchemeNameDialog();
+    });
+    actionDialog.addEventListener("click", (event) => {
+      if (event.target === actionDialog) closeDialog();
+    });
+    window.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      if (schemeGallery?.querySelector(".scheme-delete-popover")) {
+        removeSchemeDeleteConfirm();
+        return;
+      }
+      if (!equipmentPickerDialog.hidden) {
+        closeEquipmentPickerDialog();
+        return;
+      }
+      if (!equipmentPreviewDialog.hidden) {
+        closeEquipmentPreview();
+        return;
+      }
+      if (!equipmentDetailDialog.hidden) {
+        closeEquipmentDetail();
+        return;
+      }
+      if (!equipmentDialog.hidden) {
+        closeEquipmentDialog();
+        return;
+      }
+      if (!schemeNameDialog.hidden) {
+        closeSchemeNameDialog();
+        return;
+      }
+      if (!actionDialog.hidden) {
+        closeDialog();
+        return;
+      }
+      if (!equipmentPage.hidden) closeEquipmentPage();
+    });
+    hero.addEventListener("dblclick", (event) => {
+      if (!shouldCreateAnchorFromEvent(event)) return;
+      createAnchorAtEvent(event);
+    });
+    hero.addEventListener("pointerdown", startLongPress);
+    hero.addEventListener("pointermove", moveLongPress);
+    hero.addEventListener("pointerup", cancelLongPress);
+    hero.addEventListener("pointercancel", cancelLongPress);
+    hero.addEventListener("pointerleave", cancelLongPress);
+    window.addEventListener("resize", drawConnections);
+    window.addEventListener("load", drawConnections);
+
+    syncEquipmentOverrideCards();
+    syncDeletedDeviceCards();
+    populateDeviceSelect();
+    renderSavedSchemes();
+    renderAnchors();
+  </script>
+</body>
+</html>
