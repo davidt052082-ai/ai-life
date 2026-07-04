@@ -2604,6 +2604,7 @@
     let deviceLayout = loadDeviceLayout();
     let removedEquipmentIds = loadRemovedEquipmentIds();
     let deviceCardDragId = null;
+    let shouldAttachNewEquipmentToScheme = true;
     let activeDetailDeviceId = null;
     let latestCollectedProduct = null;
 
@@ -3901,7 +3902,7 @@
 
     function openCustomEquipmentFromPicker() {
       closeEquipmentPickerDialog();
-      openEquipmentDialog();
+      openEquipmentDialog(true);
     }
 
     function setEquipmentView(mode) {
@@ -4238,16 +4239,11 @@
       const device = getDeviceById(deviceId);
       if (!device) return;
 
-      if (device.source === "custom") {
-        customEquipment = customEquipment.filter((item) => item.id !== deviceId);
-        saveCustomEquipment();
-      } else {
+      if (device.source !== "custom") {
         deletedEquipmentIds = [...new Set(deletedEquipmentIds.concat(deviceId))];
         saveDeletedEquipmentIds();
         syncDeletedDeviceCards();
       }
-      delete equipmentOverrides[deviceId];
-      saveEquipmentOverrides();
 
       anchors = anchors.map((anchor) => (
         anchor.device === deviceId ? { ...anchor, device: "" } : anchor
@@ -4291,7 +4287,8 @@
       deleteEquipment(deletingId);
     }
 
-    function openEquipmentDialog() {
+    function openEquipmentDialog(attachToScheme = true) {
+      shouldAttachNewEquipmentToScheme = typeof attachToScheme === "boolean" ? attachToScheme : true;
       latestCollectedProduct = null;
       newEquipmentUrl.value = "";
       newEquipmentName.value = "";
@@ -4509,12 +4506,16 @@
       };
       customEquipment.push(equipment);
       saveCustomEquipment();
-      createAnchorForNewEquipment(equipment);
+      if (shouldAttachNewEquipmentToScheme) {
+        createAnchorForNewEquipment(equipment);
+      }
       populateDeviceSelect();
       renderEquipmentPage();
       renderEquipmentSlots();
+      renderEquipmentInfo();
       closeEquipmentDialog();
       latestCollectedProduct = null;
+      shouldAttachNewEquipmentToScheme = true;
     }
 
     function createAnchorAtEvent(event) {
@@ -4698,7 +4699,7 @@
     cancelEquipmentPickerButton.addEventListener("click", closeEquipmentPickerDialog);
     confirmEquipmentPickerButton.addEventListener("click", confirmEquipmentPicker);
     customEquipmentFromPickerButton.addEventListener("click", openCustomEquipmentFromPicker);
-    addEquipmentFromInfoButton?.addEventListener("click", openEquipmentDialog);
+    addEquipmentFromInfoButton?.addEventListener("click", () => openEquipmentDialog(false));
     fetchEquipmentInfoButton.addEventListener("click", fetchEquipmentInfo);
     openProductBrowserButton.addEventListener("click", openProductInBrowser);
     collectBrowserProductButton.addEventListener("click", collectProductFromBrowser);
