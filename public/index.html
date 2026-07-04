@@ -3192,9 +3192,13 @@
       return `${new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(amount)} 元`;
     }
 
+    function getCurrentSchemeDeviceIds() {
+      return new Set(anchors.map((anchor) => anchor.device).filter(Boolean));
+    }
+
     function getEquippedDevices() {
       const devices = getDevices();
-      const selectedDeviceIds = [...new Set(anchors.map((anchor) => anchor.device).filter(Boolean))];
+      const selectedDeviceIds = [...getCurrentSchemeDeviceIds()];
       return selectedDeviceIds
         .map((id) => devices.find((device) => device.id === id))
         .filter(Boolean);
@@ -3526,10 +3530,10 @@
     function syncCustomDeviceCards() {
       if (!rightDeviceStack) return;
       document.querySelectorAll("[data-custom-device]").forEach((card) => card.remove());
-      const equippedIds = new Set(anchors.map((anchor) => anchor.device).filter(Boolean));
+      const equippedIds = getCurrentSchemeDeviceIds();
       const visibleCustomDevices = customEquipment
         .map((item) => ({ ...item, ...(equipmentOverrides[item.id] || {}) }))
-        .filter((device) => equippedIds.has(device.id) && !deletedEquipmentIds.includes(device.id));
+        .filter((device) => equippedIds.has(device.id) && !deletedEquipmentIds.includes(device.id) && !removedEquipmentIds.includes(device.id));
       visibleCustomDevices.forEach((device) => {
         const template = document.createElement("template");
         template.innerHTML = renderCustomDeviceCard(device).trim();
@@ -3649,6 +3653,7 @@
           if (card) stack.appendChild(card);
         });
       });
+      syncDeletedDeviceCards();
       setupDeviceCardDragInteractions();
     }
 
@@ -3678,8 +3683,10 @@
     }
 
     function syncDeletedDeviceCards() {
+      const equippedIds = getCurrentSchemeDeviceIds();
       document.querySelectorAll(".device-card[data-device]").forEach((card) => {
-        card.hidden = deletedEquipmentIds.includes(card.dataset.device) || removedEquipmentIds.includes(card.dataset.device);
+        const deviceId = card.dataset.device;
+        card.hidden = deletedEquipmentIds.includes(deviceId) || removedEquipmentIds.includes(deviceId) || !equippedIds.has(deviceId);
       });
     }
 
@@ -3814,7 +3821,7 @@
         const device = getDevices().find((item) => item.id === anchor.device);
         if (!device) return;
 
-        if (!device.card) return;
+        if (!device.card || device.card.hidden) return;
         device.card.classList.add("linked");
         const cardRect = device.card.getBoundingClientRect();
         const anchorX = (anchor.x / 100) * rect.width;
@@ -4267,12 +4274,12 @@
       if (device.source !== "custom") {
         deletedEquipmentIds = [...new Set(deletedEquipmentIds.concat(deviceId))];
         saveDeletedEquipmentIds();
-        syncDeletedDeviceCards();
       }
 
-      anchors = anchors.map((anchor) => (
-        anchor.device === deviceId ? { ...anchor, device: "" } : anchor
-      ));
+      anchors = anchors.filter((anchor) => anchor.device !== deviceId);
+      if (!anchors.some((anchor) => anchor.id === selectedAnchorId)) {
+        selectedAnchorId = anchors[0]?.id || null;
+      }
       saveAnchors();
       populateDeviceSelect();
       renderEquipmentPage();
