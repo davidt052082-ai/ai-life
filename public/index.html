@@ -349,6 +349,10 @@
       box-shadow: inset 0 0 0 1px rgba(69, 232, 255, 0.22), 0 0 18px rgba(69, 232, 255, 0.08);
     }
 
+    .device-card[hidden] {
+      display: none;
+    }
+
     .device-card[draggable="true"] {
       cursor: grab;
     }
@@ -2525,6 +2529,18 @@
       { id: "foot", label: "脚部", x: 46.4, y: 90.2, device: "smart-shoes" }
     ];
 
+    const bodyAnchorTargets = [
+      { label: "头部", x: 41.4, y: 22.4, pattern: /头部|头显|头环|头盔|head|neuro/i },
+      { label: "眼部", x: 41.5, y: 25.1, pattern: /眼部|眼镜|隐形眼镜|眼|lens|eye|ar/i },
+      { label: "耳部", x: 38.7, y: 25.6, pattern: /耳部|耳塞|耳机|耳|ear/i },
+      { label: "胸口", x: 41.3, y: 36.5, pattern: /胸口|胸贴|胸|心电|ecg|chest/i },
+      { label: "手腕", x: 33.4, y: 53.4, pattern: /手腕|手表|腕带|手环|腕|watch|band|wrist/i },
+      { label: "手指", x: 49, y: 57.2, pattern: /手指|指环|戒指|ring|finger/i },
+      { label: "腹部/腰部", x: 41.4, y: 48.9, pattern: /腹部|腰部|腰带|胃电|胃肠|esg|waist|abdomen/i },
+      { label: "膝腿", x: 45.5, y: 73.4, pattern: /膝腿|膝|腿|护膝|knee|leg/i },
+      { label: "脚部", x: 46.4, y: 90.2, pattern: /脚部|脚|鞋|shoe|foot|feet/i }
+    ];
+
     const defaultDeviceLayout = {
       left: ["headset", "ar-lens", "earbuds", "wristband"],
       right: ["chest-patch", "ring", "waist-patch", "knee-band", "smart-shoes"]
@@ -3690,6 +3706,11 @@
       });
     }
 
+    function getVisibleAnchors() {
+      const availableDeviceIds = new Set(getDevices().map((device) => device.id));
+      return anchors.filter((anchor) => anchor.device && availableDeviceIds.has(anchor.device));
+    }
+
     function populateDeviceSelect() {
       const options = ['<option value="">不连接设备</option>']
         .concat(getDevices().map((device) => `<option value="${device.id}">${device.label}</option>`));
@@ -3699,7 +3720,7 @@
     function renderAnchors() {
       syncDeviceCardLayout();
       anchorLayer.innerHTML = "";
-      anchors.forEach((anchor) => {
+      getVisibleAnchors().forEach((anchor) => {
         const el = document.createElement("button");
         el.type = "button";
         el.className = `anchor ${anchor.id === selectedAnchorId ? "selected" : ""}`;
@@ -3726,7 +3747,7 @@
 
     function syncAnchorElements() {
       syncDeviceCardLayout();
-      anchors.forEach((anchor) => {
+      getVisibleAnchors().forEach((anchor) => {
         const el = anchorLayer.querySelector(`[data-id="${anchor.id}"]`);
         if (!el) return;
         el.dataset.label = anchor.label;
@@ -3816,7 +3837,7 @@
 
       getDevices().forEach(({ card }) => card?.classList.remove("linked"));
 
-      anchors.forEach((anchor) => {
+      getVisibleAnchors().forEach((anchor) => {
         if (!anchor.device) return;
         const device = getDevices().find((item) => item.id === anchor.device);
         if (!device) return;
@@ -4557,29 +4578,54 @@
       showAddAnchorDialog(x, y);
     }
 
-    function getNextEquipmentAnchorPosition() {
-      const occupied = new Set(anchors.map((anchor) => `${Math.round(anchor.x)}:${Math.round(anchor.y)}`));
-      const positions = [
-        { x: 63, y: 22 },
-        { x: 63, y: 34 },
-        { x: 63, y: 46 },
-        { x: 63, y: 58 },
-        { x: 63, y: 70 },
-        { x: 37, y: 22 },
-        { x: 37, y: 34 },
-        { x: 37, y: 46 },
-        { x: 37, y: 58 },
-        { x: 37, y: 70 }
+    function getEquipmentAnchorTarget(equipment) {
+      const defaultAnchor = defaultAnchors.find((anchor) => anchor.device === equipment.id);
+      if (defaultAnchor) return defaultAnchor;
+
+      const collected = equipment.collectedProduct || {};
+      const text = [
+        getUsagePositionLabel(equipment),
+        bodyPartLabel(collected.bodyPart),
+        equipment.label,
+        equipment.subtitle,
+        equipment.metrics,
+        ...(equipment.tags || []),
+        ...(getFunctionPoints(equipment) || [])
+      ].filter(Boolean).join(" ");
+      return bodyAnchorTargets.find((target) => target.pattern.test(text)) || bodyAnchorTargets.find((target) => target.label === "腹部/腰部");
+    }
+
+    function isAnchorPositionOccupied(position) {
+      return getVisibleAnchors().some((anchor) => (
+        Math.hypot(anchor.x - position.x, anchor.y - position.y) < 2.4
+      ));
+    }
+
+    function getNextEquipmentAnchorPosition(equipment) {
+      const target = getEquipmentAnchorTarget(equipment);
+      const offsets = [
+        { x: 0, y: 0 },
+        { x: 1.6, y: 1.6 },
+        { x: -1.6, y: 1.6 },
+        { x: 1.8, y: -1.2 },
+        { x: -1.8, y: -1.2 },
+        { x: 0, y: 3.2 },
+        { x: 0, y: -3.2 }
       ];
-      return positions.find((position) => !occupied.has(`${position.x}:${position.y}`)) || {
-        x: 63,
-        y: clamp(22 + anchors.length * 6, 18, 88)
-      };
+      return offsets
+        .map((offset) => ({
+          x: clamp(target.x + offset.x, 30, 52),
+          y: clamp(target.y + offset.y, 18, 92)
+        }))
+        .find((position) => !isAnchorPositionOccupied(position)) || {
+          x: target.x,
+          y: target.y
+        };
     }
 
     function createAnchorForNewEquipment(equipment) {
-      const position = getNextEquipmentAnchorPosition();
-      const label = equipment.usagePositionLabel || equipment.label.split(" / ")[0] || "新增装备";
+      const position = getNextEquipmentAnchorPosition(equipment);
+      const label = getUsagePositionLabel(equipment) || equipment.label.split(" / ")[0] || "新增装备";
       createAnchorAt(position.x, position.y, label, equipment.id);
     }
 
