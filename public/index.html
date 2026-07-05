@@ -315,7 +315,10 @@
       grid-column: 1;
       display: grid;
       grid-template-columns: 1fr;
+      align-content: center;
+      align-self: stretch;
       gap: 12px;
+      min-height: 560px;
     }
 
     .card-stack + .body-stage + .card-stack {
@@ -330,6 +333,7 @@
     .card-stack.drag-over {
       outline: 1px dashed rgba(69, 232, 255, 0.42);
       outline-offset: 8px;
+      background: rgba(69, 232, 255, 0.04);
     }
 
     .device-card {
@@ -1979,6 +1983,7 @@
         grid-column: 1;
         grid-row: auto;
         grid-template-columns: repeat(2, 1fr);
+        min-height: 120px;
       }
 
       .body-stage {
@@ -2044,6 +2049,10 @@
       .grid-2,
       .grid-3 {
         grid-template-columns: 1fr;
+      }
+
+      .card-stack {
+        min-height: 0;
       }
 
       .share-copy {
@@ -3610,7 +3619,7 @@
 
     function getDragInsertBefore(stack, pointerY) {
       return Array.from(stack.children)
-        .filter((child) => child.matches?.(".device-card[data-device]") && !child.classList.contains("dragging"))
+        .filter((child) => child.matches?.(".device-card[data-device]") && !child.hidden && !child.classList.contains("dragging"))
         .find((child) => {
           const rect = child.getBoundingClientRect();
           return pointerY < rect.top + rect.height / 2;
