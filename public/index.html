@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=1480, initial-scale=1.0" />
   <title>全身智能穿戴监测系统设计方案</title>
   <style>
     :root {
@@ -22,6 +22,7 @@
       --card-radius: 8px;
       --shadow-cyan: 0 0 28px rgba(69, 232, 255, 0.22);
       --shadow-orange: 0 0 24px rgba(255, 159, 53, 0.18);
+      --desktop-poster-width: 1480px;
     }
 
     * {
@@ -39,6 +40,11 @@
         radial-gradient(circle at 18% 70%, rgba(255, 159, 53, 0.12), transparent 26rem),
         linear-gradient(180deg, #07101c 0%, #050811 50%, #03050a 100%);
       letter-spacing: 0;
+      overflow-x: auto;
+    }
+
+    body.desktop-poster-mode {
+      min-width: var(--desktop-poster-width);
     }
 
     body::before {
@@ -54,7 +60,8 @@
     }
 
     .page {
-      width: min(1480px, calc(100vw - 32px));
+      width: var(--desktop-poster-width);
+      min-width: var(--desktop-poster-width);
       margin: 0 auto;
       padding: 24px 0 56px;
     }
@@ -116,6 +123,24 @@
       z-index: 6;
       text-align: center;
       padding: 28px 24px 10px;
+    }
+
+    .project-home-link {
+      position: absolute;
+      top: 28px;
+      left: 28px;
+      border: 1px solid rgba(69, 232, 255, 0.48);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #bff7ff;
+      background: rgba(5, 18, 30, 0.78);
+      font-size: 14px;
+      text-decoration: none;
+    }
+
+    .project-home-link:hover {
+      border-color: var(--cyan);
+      color: #ffffff;
     }
 
     .title-frame {
@@ -2115,15 +2140,138 @@
         font-size: 24px;
       }
     }
+
+    @media (max-width: 1120px) {
+      body.desktop-poster-mode .hero-shell {
+        min-height: 860px;
+      }
+
+      body.desktop-poster-mode .loadout {
+        grid-template-columns: minmax(250px, 310px) minmax(330px, 1fr) minmax(250px, 310px) minmax(220px, 280px);
+        padding: 8px 28px 26px;
+      }
+
+      body.desktop-poster-mode .card-stack {
+        grid-column: 1;
+        grid-row: 1;
+        grid-template-columns: 1fr;
+        min-height: 560px;
+      }
+
+      body.desktop-poster-mode .card-stack + .body-stage + .card-stack {
+        grid-column: 3;
+        grid-row: 1;
+      }
+
+      body.desktop-poster-mode .body-stage {
+        grid-column: 2;
+        grid-row: 1;
+        order: 0;
+        min-height: 650px;
+      }
+
+      body.desktop-poster-mode .equipment-panel {
+        grid-column: 4;
+        grid-row: 1;
+        min-height: 620px;
+      }
+
+      body.desktop-poster-mode .equipment-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      body.desktop-poster-mode .summary-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      body.desktop-poster-mode .share-section {
+        grid-template-columns: 1fr;
+      }
+
+      body.desktop-poster-mode .grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 720px) {
+      body.desktop-poster-mode .page {
+        width: var(--desktop-poster-width);
+        min-width: var(--desktop-poster-width);
+        padding: 24px 0 56px;
+      }
+
+      body.desktop-poster-mode .title-frame {
+        padding: 12px 52px 14px;
+        border-radius: 0;
+        clip-path: polygon(36px 0, calc(100% - 36px) 0, 100% 50%, calc(100% - 36px) 100%, 36px 100%, 0 50%);
+      }
+
+      body.desktop-poster-mode section {
+        padding: 28px;
+      }
+
+      body.desktop-poster-mode .summary-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      body.desktop-poster-mode .share-section {
+        grid-template-columns: 1fr;
+      }
+
+      body.desktop-poster-mode .grid-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      body.desktop-poster-mode .grid-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      body.desktop-poster-mode .share-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      body.desktop-poster-mode .share-copy {
+        align-items: center;
+        flex-direction: row;
+      }
+
+      body.desktop-poster-mode .share-actions {
+        align-items: center;
+        flex-direction: row;
+      }
+
+      body.desktop-poster-mode .equipment-info-head {
+        align-items: center;
+        flex-direction: row;
+      }
+
+      body.desktop-poster-mode .equipment-slot .slot-name,
+      body.desktop-poster-mode .equipment-slot .slot-model {
+        display: block;
+      }
+
+      body.desktop-poster-mode .url-fetch-row {
+        grid-template-columns: minmax(0, 1fr) repeat(3, auto);
+      }
+
+      body.desktop-poster-mode h1 {
+        font-size: clamp(30px, 4vw, 56px);
+      }
+
+      body.desktop-poster-mode h2 {
+        font-size: 28px;
+      }
+    }
   </style>
 </head>
-<body>
+<body class="desktop-poster-mode">
   <main class="page">
     <div class="hero-shell">
-      <img class="hero-bg" src="assets/cyber-body-base.png" alt="偏现实未来科技朋克人体主视觉" />
+      <img class="hero-bg" src="/assets/cyber-body-base.png" alt="偏现实未来科技朋克人体主视觉" />
       <svg id="connectionLayer" class="hero-connectors" aria-hidden="true"></svg>
       <div id="anchorLayer" class="anchor-layer" aria-label="可编辑身体锚点层"></div>
       <header class="title-band">
+        <a class="project-home-link" href="/">返回项目首页</a>
         <div class="title-frame">
           <h1>全身智能穿戴监测系统</h1>
         </div>
@@ -2641,6 +2789,17 @@
     let shouldAttachNewEquipmentToScheme = true;
     let activeDetailDeviceId = null;
     let latestCollectedProduct = null;
+    let storageMode = "guest";
+    const WEARABLE_API_ROOT = "/api/projects/wearable-monitoring/wearable";
+    let workspaceVersion = 0;
+    let serverStateLoaded = false;
+    let serverSavedSchemes = null;
+    let serverSyncQueue = Promise.resolve();
+    let workspaceSaveTimer = null;
+    const equipmentVersions = new Map();
+    const serverCustomPayloads = new Map();
+    const serverBuiltinPayloads = new Map();
+    const serverSchemePayloads = new Map();
 
     function loadAnchors() {
       if (window.__SNAPSHOT_STATE__?.anchors) return structuredClone(window.__SNAPSHOT_STATE__.anchors);
@@ -2656,6 +2815,7 @@
     function saveAnchors() {
       if (window.__SNAPSHOT_STATE__) return;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(anchors));
+      scheduleWorkspaceSave();
     }
 
     function loadCustomEquipment() {
@@ -2672,6 +2832,7 @@
     function saveCustomEquipment() {
       if (window.__SNAPSHOT_STATE__) return;
       localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(customEquipment));
+      scheduleCustomEquipmentSync();
     }
 
     function loadDeletedEquipmentIds() {
@@ -2688,6 +2849,7 @@
     function saveDeletedEquipmentIds() {
       if (window.__SNAPSHOT_STATE__) return;
       localStorage.setItem(DELETED_EQUIPMENT_STORAGE_KEY, JSON.stringify(deletedEquipmentIds));
+      scheduleBuiltinEquipmentSync();
     }
 
     function loadEquipmentOverrides() {
@@ -2704,6 +2866,7 @@
     function saveEquipmentOverrides() {
       if (window.__SNAPSHOT_STATE__) return;
       localStorage.setItem(EQUIPMENT_OVERRIDES_STORAGE_KEY, JSON.stringify(equipmentOverrides));
+      scheduleBuiltinEquipmentSync();
     }
 
     function loadDeviceLayout() {
@@ -2720,6 +2883,7 @@
     function saveDeviceLayout() {
       if (window.__SNAPSHOT_STATE__) return;
       localStorage.setItem(DEVICE_LAYOUT_STORAGE_KEY, JSON.stringify(deviceLayout));
+      scheduleWorkspaceSave();
     }
 
     function loadRemovedEquipmentIds() {
@@ -2736,9 +2900,11 @@
     function saveRemovedEquipmentIds() {
       if (window.__SNAPSHOT_STATE__) return;
       localStorage.setItem(REMOVED_EQUIPMENT_STORAGE_KEY, JSON.stringify(removedEquipmentIds));
+      scheduleWorkspaceSave();
     }
 
     function loadSavedSchemes() {
+      if (Array.isArray(serverSavedSchemes)) return serverSavedSchemes;
       try {
         const saved = JSON.parse(localStorage.getItem(SAVED_SCHEMES_STORAGE_KEY) || "[]");
         if (Array.isArray(saved)) return saved;
@@ -2749,7 +2915,233 @@
     }
 
     function saveSavedSchemes(schemes) {
+      serverSavedSchemes = schemes;
       localStorage.setItem(SAVED_SCHEMES_STORAGE_KEY, JSON.stringify(schemes));
+      scheduleSavedSchemeSync();
+    }
+
+    async function wearableApiFetch(path, options = {}) {
+      const response = await fetch(`${WEARABLE_API_ROOT}${path}`, {
+        credentials: "same-origin",
+        ...options,
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+      });
+      if (response.status === 401) {
+        window.location.replace("/login");
+        throw new Error("AUTH_REQUIRED");
+      }
+      if (response.status === 403) {
+        window.location.replace("/");
+        throw new Error("PROJECT_ACCESS_DENIED");
+      }
+      return response;
+    }
+
+    function enqueueServerSync(work) {
+      if (storageMode !== "account" || !serverStateLoaded || window.__SNAPSHOT_STATE__) return Promise.resolve();
+      serverSyncQueue = serverSyncQueue.then(work).catch((error) => {
+        console.warn("Wearable state sync failed:", error);
+        if (saveSchemeStatus) saveSchemeStatus.textContent = "同步失败，当前修改尚未保存到服务器。";
+      });
+      return serverSyncQueue;
+    }
+
+    function scheduleWorkspaceSave() {
+      if (storageMode !== "account" || !serverStateLoaded || window.__SNAPSHOT_STATE__) return;
+      window.clearTimeout(workspaceSaveTimer);
+      workspaceSaveTimer = window.setTimeout(() => {
+        enqueueServerSync(async () => {
+          const response = await wearableApiFetch("/state", {
+            method: "PUT",
+            body: JSON.stringify({ anchors, deviceLayout, removedEquipmentIds, version: workspaceVersion })
+          });
+          if (response.status === 409) throw new Error("数据已在其他位置更新，请刷新后重试。");
+          if (!response.ok) throw new Error("工作区保存失败。");
+          const result = await response.json();
+          workspaceVersion = result.workspace.version;
+        });
+      }, 300);
+    }
+
+    function scheduleCustomEquipmentSync() {
+      enqueueServerSync(async () => {
+        const current = new Map(customEquipment.map((item) => [item.id, item]));
+        for (const [id] of serverCustomPayloads) {
+          if (current.has(id)) continue;
+          const response = await wearableApiFetch(`/equipment/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            body: JSON.stringify({ version: equipmentVersions.get(id) })
+          });
+          if (!response.ok && response.status !== 404) throw new Error("装备删除失败。");
+          serverCustomPayloads.delete(id);
+          equipmentVersions.delete(id);
+        }
+        for (const [id, data] of current) {
+          const serialized = JSON.stringify(data);
+          if (serverCustomPayloads.get(id) === serialized) continue;
+          const existingVersion = equipmentVersions.get(id);
+          const response = existingVersion
+            ? await wearableApiFetch(`/equipment/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ data, isDeleted: false, version: existingVersion }) })
+            : await wearableApiFetch("/equipment", { method: "POST", body: JSON.stringify({ id, data }) });
+          if (response.status === 409) throw new Error("装备已在其他位置更新，请刷新后重试。");
+          if (!response.ok) throw new Error("装备保存失败。");
+          const result = await response.json();
+          equipmentVersions.set(id, result.equipment.version);
+          serverCustomPayloads.set(id, serialized);
+        }
+      });
+    }
+
+    function scheduleBuiltinEquipmentSync() {
+      enqueueServerSync(async () => {
+        const ids = new Set([...Object.keys(equipmentOverrides), ...deletedEquipmentIds]);
+        for (const id of ids) {
+          const data = equipmentOverrides[id] || {};
+          const serialized = JSON.stringify({ data, isDeleted: deletedEquipmentIds.includes(id) });
+          if (serverBuiltinPayloads.get(id) === serialized) continue;
+          const response = await wearableApiFetch(`/equipment/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ sourceType: "builtin_override", data, isDeleted: deletedEquipmentIds.includes(id) })
+          });
+          if (!response.ok) throw new Error("内置装备保存失败。");
+          const result = await response.json();
+          equipmentVersions.set(id, result.equipment.version);
+          serverBuiltinPayloads.set(id, serialized);
+        }
+      });
+    }
+
+    function scheduleSavedSchemeSync() {
+      enqueueServerSync(async () => {
+        const schemes = loadSavedSchemes();
+        const current = new Map(schemes.map((scheme) => [scheme.id, scheme]));
+        for (const [id] of serverSchemePayloads) {
+          if (current.has(id)) continue;
+          const response = await wearableApiFetch(`/schemes/${encodeURIComponent(id)}`, { method: "DELETE" });
+          if (!response.ok && response.status !== 404) throw new Error("方案删除失败。");
+          serverSchemePayloads.delete(id);
+        }
+        for (const [id, scheme] of current) {
+          const serialized = JSON.stringify(scheme);
+          if (serverSchemePayloads.get(id) === serialized) continue;
+          const response = await wearableApiFetch("/schemes", {
+            method: "POST",
+            body: JSON.stringify({ id, title: scheme.title, evaluation: scheme.evaluation, thumbnailUrl: scheme.thumbnailUrl, snapshot: scheme.snapshot })
+          });
+          if (!response.ok) throw new Error("方案保存失败。");
+          serverSchemePayloads.set(id, serialized);
+        }
+      });
+    }
+
+    function hasLegacyLocalData() {
+      return [STORAGE_KEY, EQUIPMENT_STORAGE_KEY, DELETED_EQUIPMENT_STORAGE_KEY, EQUIPMENT_OVERRIDES_STORAGE_KEY, DEVICE_LAYOUT_STORAGE_KEY, REMOVED_EQUIPMENT_STORAGE_KEY, SAVED_SCHEMES_STORAGE_KEY]
+        .some((key) => localStorage.getItem(key));
+    }
+
+    function buildLegacyLocalPayload() {
+      return {
+        anchors: loadAnchors(),
+        customEquipment: loadCustomEquipment(),
+        deletedEquipmentIds: loadDeletedEquipmentIds(),
+        equipmentOverrides: loadEquipmentOverrides(),
+        deviceLayout: loadDeviceLayout(),
+        removedEquipmentIds: loadRemovedEquipmentIds(),
+        schemes: Array.isArray(serverSavedSchemes) ? serverSavedSchemes : (() => {
+          try { return JSON.parse(localStorage.getItem(SAVED_SCHEMES_STORAGE_KEY) || "[]"); } catch { return []; }
+        })()
+      };
+    }
+
+    function applyServerState(state) {
+      const workspace = state.workspace || {};
+      if (workspace.version > 0) {
+        anchors = Array.isArray(workspace.anchors) ? workspace.anchors : [];
+        deviceLayout = workspace.deviceLayout || { left: [], right: [] };
+        removedEquipmentIds = Array.isArray(workspace.removedEquipmentIds) ? workspace.removedEquipmentIds : [];
+      } else {
+        anchors = structuredClone(defaultAnchors);
+        deviceLayout = structuredClone(defaultDeviceLayout);
+        removedEquipmentIds = [];
+      }
+      workspaceVersion = workspace.version || 0;
+      customEquipment = [];
+      deletedEquipmentIds = [];
+      equipmentOverrides = {};
+      equipmentVersions.clear();
+      serverCustomPayloads.clear();
+      serverBuiltinPayloads.clear();
+      (state.equipment || []).forEach((record) => {
+        equipmentVersions.set(record.id, record.version);
+        if (record.sourceType === "custom") {
+          if (!record.isDeleted) {
+            customEquipment.push(record.data);
+            serverCustomPayloads.set(record.id, JSON.stringify(record.data));
+          }
+          return;
+        }
+        if (Object.keys(record.data || {}).length) equipmentOverrides[record.id] = record.data;
+        if (record.isDeleted) deletedEquipmentIds.push(record.id);
+        serverBuiltinPayloads.set(record.id, JSON.stringify({ data: record.data || {}, isDeleted: Boolean(record.isDeleted) }));
+      });
+      serverSavedSchemes = Array.isArray(state.schemes) ? state.schemes : [];
+      serverSchemePayloads.clear();
+      serverSavedSchemes.forEach((scheme) => serverSchemePayloads.set(scheme.id, JSON.stringify(scheme)));
+    }
+
+    function renderActiveProject() {
+      syncEquipmentOverrideCards();
+      syncDeletedDeviceCards();
+      populateDeviceSelect();
+      renderSavedSchemes();
+      renderAnchors();
+    }
+
+    function initializeGuestProject() {
+      storageMode = "guest";
+      serverStateLoaded = false;
+      workspaceVersion = 0;
+      serverSavedSchemes = null;
+      equipmentVersions.clear();
+      serverCustomPayloads.clear();
+      serverBuiltinPayloads.clear();
+      serverSchemePayloads.clear();
+      anchors = loadAnchors();
+      customEquipment = loadCustomEquipment();
+      deletedEquipmentIds = loadDeletedEquipmentIds();
+      equipmentOverrides = loadEquipmentOverrides();
+      deviceLayout = loadDeviceLayout();
+      removedEquipmentIds = loadRemovedEquipmentIds();
+      renderActiveProject();
+    }
+
+    async function initializeAccountProject() {
+      storageMode = "account";
+      let response = await wearableApiFetch("/state");
+      if (!response.ok) throw new Error("无法读取项目数据。");
+      let state = await response.json();
+      if (!state.migration?.completed && hasLegacyLocalData()) {
+        const shouldImport = window.confirm("检测到此浏览器的旧装备与方案数据，是否导入到当前账号？");
+        if (shouldImport) {
+          const migration = await wearableApiFetch("/migrate-local-data", { method: "POST", body: JSON.stringify(buildLegacyLocalPayload()) });
+          if (!migration.ok) throw new Error("旧数据导入失败。");
+          state = (await migration.json()).state || state;
+        }
+      }
+      applyServerState(state);
+      serverStateLoaded = true;
+      renderActiveProject();
+      if (workspaceVersion === 0) scheduleWorkspaceSave();
+    }
+
+    async function initializeWearableProject() {
+      const me = await fetch("/api/auth/me");
+      if (me.status === 401) {
+        initializeGuestProject();
+        return;
+      }
+      if (!me.ok) throw new Error("无法确认登录状态。");
+      await initializeAccountProject();
     }
 
     function getEvaluationSnapshot() {
@@ -4869,11 +5261,10 @@
     window.addEventListener("resize", drawConnections);
     window.addEventListener("load", drawConnections);
 
-    syncEquipmentOverrideCards();
-    syncDeletedDeviceCards();
-    populateDeviceSelect();
-    renderSavedSchemes();
-    renderAnchors();
+    initializeWearableProject().catch((error) => {
+      console.warn("Wearable project initialization failed:", error);
+      if (saveSchemeStatus) saveSchemeStatus.textContent = "项目数据加载失败，请刷新后重试。";
+    });
   </script>
 </body>
 </html>
