@@ -45,6 +45,28 @@ AI Life 是一个带账号、项目授权和 PostgreSQL 存储的智能健康项
 
 原有的纯静态 Cloudflare Pages 部署不能承载账号、会话和 PostgreSQL API；正式发布应使用支持 Node.js 服务和数据库连接的运行环境。
 
+## 线上更新
+
+当前线上目录为腾讯云服务器的 `/opt/ai-life`，服务由 PM2 进程 `ai-life` 运行，Nginx 反向代理到本机 `127.0.0.1:5173`。
+
+本地网页或后端代码更新后，先提交并推送到 GitHub `main`。服务器如果可以稳定访问 GitHub 仓库，可以在 `/opt/ai-life` 执行 `git pull origin main`。如果 `git pull` 因网络超时失败，可使用 GitHub tarball 更新：
+
+```bash
+cd /opt
+curl -L --retry 3 https://codeload.github.com/davidt052082-ai/ai-life/tar.gz/main -o /tmp/ai-life-main.tar.gz
+rm -rf /tmp/ai-life-main
+mkdir -p /tmp/ai-life-main
+tar -xzf /tmp/ai-life-main.tar.gz -C /tmp/ai-life-main --strip-components=1
+rsync -a --delete --exclude ".env" /tmp/ai-life-main/ /opt/ai-life/
+cd /opt/ai-life
+npm ci
+npm run db:migrate
+pm2 restart ai-life --update-env
+pm2 save
+```
+
+不要覆盖服务器上的 `/opt/ai-life/.env`，其中包含生产数据库和会话配置。
+
 ## 测试
 
 ```bash
