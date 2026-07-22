@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>登录 | AI Life</title>
+  <style>
+    :root { color-scheme: dark; --bg: #050811; --panel: rgba(8, 23, 36, .9); --cyan: #45e8ff; --orange: #ff9f35; --text: #effcff; --muted: #9dc6d1; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif; background: radial-gradient(circle at 50% 20%, rgba(69,232,255,.17), transparent 32rem), linear-gradient(160deg, #081322, #050811 60%); }
+    main { width: min(440px, calc(100vw - 32px)); padding: 32px; border: 1px solid rgba(69,232,255,.46); border-radius: 8px; background: var(--panel); box-shadow: 0 20px 70px rgba(0,0,0,.42), inset 0 0 34px rgba(69,232,255,.06); }
+    .eyebrow { margin: 0 0 10px; color: var(--cyan); font-size: 13px; font-weight: 700; }
+    h1 { margin: 0; font-size: 30px; letter-spacing: 0; }
+    .copy { margin: 12px 0 28px; color: var(--muted); line-height: 1.65; }
+    label { display: grid; gap: 8px; margin: 16px 0; color: #d4eff6; font-size: 14px; }
+    input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid rgba(69,232,255,.42); border-radius: 6px; color: var(--text); background: rgba(2,11,20,.72); font: inherit; }
+    input:focus { outline: 2px solid rgba(69,232,255,.35); border-color: var(--cyan); }
+    button { width: 100%; min-height: 46px; margin-top: 12px; border: 1px solid var(--orange); border-radius: 6px; color: #fff5e9; background: rgba(109,55,14,.52); font: inherit; font-weight: 700; cursor: pointer; }
+    button:hover { background: rgba(159,79,20,.7); }
+    .status { min-height: 24px; margin: 14px 0 0; color: #ffbd7d; font-size: 14px; }
+    .footer { margin: 22px 0 0; color: var(--muted); text-align: center; font-size: 14px; }
+    a { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">AI LIFE / PROJECT ACCESS</p>
+    <h1>登录</h1>
+    <p class="copy">进入已授权的智能健康项目。</p>
+    <form id="loginForm">
+      <label>邮箱<input id="email" type="email" autocomplete="email" required /></label>
+      <label>密码<input id="password" type="password" autocomplete="current-password" required /></label>
+      <button type="submit">登录</button>
+      <p id="status" class="status" aria-live="polite"></p>
+    </form>
+    <p class="footer">还没有账号？<a href="/register">注册</a></p>
+  </main>
+  <script>
+    const form = document.getElementById("loginForm");
+    const status = document.getElementById("status");
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      status.textContent = "正在登录...";
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: document.getElementById("email").value.trim(), password: document.getElementById("password").value })
+      });
+      if (response.ok) {
+        window.location.assign("/");
+        return;
+      }
+      const result = await response.json().catch(() => ({}));
+      status.textContent = result.message || "登录失败，请重试。";
+    });
+  </script>
+</body>
+</html>

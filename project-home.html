@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>项目首页 | AI Life</title>
+  <style>
+    :root { color-scheme: dark; --bg: #050811; --panel: rgba(8, 23, 36, .84); --cyan: #45e8ff; --orange: #ff9f35; --text: #effcff; --muted: #9dc6d1; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; color: var(--text); font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif; background: radial-gradient(circle at 50% 0%, rgba(69,232,255,.15), transparent 34rem), linear-gradient(160deg, #091626, #050811 65%); }
+    .page { width: min(1180px, calc(100vw - 40px)); margin: 0 auto; padding: 48px 0 72px; }
+    header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 32px; border-bottom: 1px solid rgba(69,232,255,.28); }
+    .eyebrow { margin: 0 0 10px; color: var(--cyan); font-size: 13px; font-weight: 700; }
+    h1 { margin: 0; font-size: 36px; letter-spacing: 0; }
+    .copy { margin: 12px 0 0; color: var(--muted); }
+    .account { display: flex; align-items: center; gap: 12px; color: #ccebf1; white-space: nowrap; }
+    .auth-links { display: flex; align-items: center; gap: 10px; }
+    .auth-links a { border: 1px solid rgba(69,232,255,.52); border-radius: 6px; padding: 8px 12px; color: #c4f8ff; text-decoration: none; }
+    .auth-links a:last-child { border-color: rgba(255,159,53,.72); color: #ffe7d1; }
+    .logout { border: 1px solid rgba(255,159,53,.72); border-radius: 6px; padding: 8px 12px; color: #ffe7d1; background: rgba(92,45,12,.4); font: inherit; cursor: pointer; }
+    main { padding-top: 32px; }
+    .project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+    .project-card { display: grid; overflow: hidden; min-height: 340px; border: 1px solid rgba(69,232,255,.42); border-radius: 8px; color: inherit; background: var(--panel); text-decoration: none; box-shadow: inset 0 0 34px rgba(69,232,255,.04); transition: transform .18s ease, border-color .18s ease; }
+    .project-card:hover { transform: translateY(-3px); border-color: var(--cyan); }
+    .project-card img { width: 100%; height: 176px; object-fit: cover; object-position: center 18%; opacity: .9; }
+    .card-body { display: flex; flex-direction: column; padding: 20px; }
+    .card-body h2 { margin: 0; font-size: 22px; }
+    .card-body p { margin: 10px 0 20px; color: var(--muted); line-height: 1.6; }
+    .card-body span { margin-top: auto; color: var(--orange); font-weight: 700; }
+    .empty { padding: 34px; border: 1px dashed rgba(69,232,255,.45); color: var(--muted); }
+    @media (max-width: 640px) { .page { width: min(100% - 28px, 1180px); padding-top: 28px; } header { display: grid; } h1 { font-size: 28px; } .account { justify-content: space-between; } }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div><p class="eyebrow">AI LIFE / PROJECT DIRECTORY</p><h1>项目首页</h1><p class="copy">选择一个已获授权的项目进入。</p></div>
+      <div class="account"><span id="accountName">正在加载...</span><div id="authLinks" class="auth-links" hidden><a href="/login">登录</a><a href="/register">注册</a></div><button id="logoutButton" class="logout" type="button">退出登录</button></div>
+    </header>
+    <main><div id="projectGrid" class="project-grid" aria-live="polite"></div></main>
+  </div>
+  <script>
+    const projectGrid = document.getElementById("projectGrid");
+    const accountName = document.getElementById("accountName");
+    const authLinks = document.getElementById("authLinks");
+    const logoutButton = document.getElementById("logoutButton");
+    const guestProjects = [{
+      name: "智能穿戴监测系统",
+      description: "以当前浏览器保存装备、锚点、布局与系统评测。",
+      route: "/projects/wearable",
+      coverImageUrl: "/assets/cyber-body-base.png"
+    }];
+    function escapeHtml(value) { const node = document.createElement("span"); node.textContent = String(value || ""); return node.innerHTML; }
+    function escapeAttribute(value) { return escapeHtml(value).replace(/"/g, "&quot;"); }
+    function renderProjects(projects) {
+      if (!projects.length) { projectGrid.innerHTML = '<div class="empty">暂无可访问项目。</div>'; return; }
+      projectGrid.innerHTML = projects.map((project) => `
+        <a class="project-card" href="${escapeAttribute(project.route)}">
+          <img src="${escapeAttribute(project.coverImageUrl || "/assets/cyber-body-base.png")}" alt="" />
+          <div class="card-body"><h2>${escapeHtml(project.name)}</h2><p>${escapeHtml(project.description)}</p><span>进入项目</span></div>
+        </a>`).join("");
+    }
+    function renderGuestProjects() {
+      accountName.textContent = "游客模式 · 数据仅保存在此浏览器";
+      authLinks.hidden = false;
+      logoutButton.hidden = true;
+      renderProjects(guestProjects);
+    }
+    async function loadHome() {
+      const meResponse = await fetch("/api/auth/me");
+      if (meResponse.status === 401) { renderGuestProjects(); return; }
+      if (!meResponse.ok) throw new Error("无法确认登录状态。");
+      const me = await meResponse.json();
+      accountName.textContent = me.user.displayName || me.user.email;
+      authLinks.hidden = true;
+      logoutButton.hidden = false;
+      const projectResponse = await fetch("/api/projects");
+      const data = await projectResponse.json();
+      if (!projectResponse.ok) { projectGrid.innerHTML = '<div class="empty">项目列表暂时无法加载。</div>'; return; }
+      renderProjects(data.projects);
+    }
+    logoutButton.addEventListener("click", async () => { await fetch("/api/auth/logout", { method: "POST" }); window.location.assign("/"); });
+    loadHome().catch(() => { projectGrid.innerHTML = '<div class="empty">项目首页暂时无法加载。</div>'; });
+  </script>
+</body>
+</html>
