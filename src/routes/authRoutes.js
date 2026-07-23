@@ -7,10 +7,10 @@ function normalizeEmail(value) {
 }
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, displayName: user.displayName };
+  return { id: user.id, email: user.email, displayName: user.displayName, isAdmin: Boolean(user.isAdmin) };
 }
 
-export function createAuthRouter({ repository, sessionService, defaultProjectCode }) {
+export function createAuthRouter({ repository, sessionService, defaultGroupCode, adminEmail = "" }) {
   const router = Router();
 
   router.post("/register", async (req, res) => {
@@ -28,7 +28,8 @@ export function createAuthRouter({ repository, sessionService, defaultProjectCod
         email,
         displayName,
         passwordHash: await hashPassword(password),
-        defaultProjectCode
+        defaultGroupCode,
+        isAdmin: Boolean(adminEmail) && email === normalizeEmail(adminEmail)
       });
       await sessionService.signIn(res, user.id);
       res.status(201).json({ user: publicUser(user) });

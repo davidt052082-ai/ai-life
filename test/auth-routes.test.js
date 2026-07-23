@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-test("registerUser normalizes the email, grants the wearable project, and signs in", async () => {
+test("registerUser normalizes the email, joins the default group, and signs in", async () => {
   const { createAuthRouter } = await import("../src/routes/authRoutes.js");
   const calls = [];
   const router = createAuthRouter({
@@ -17,7 +17,8 @@ test("registerUser normalizes the email, grants the wearable project, and signs 
       getCurrentUser: async () => null,
       signOut: async () => {}
     },
-    defaultProjectCode: "wearable-monitoring"
+    defaultGroupCode: "default",
+    adminEmail: "test@example.com"
   });
   const handler = router.stack.find((layer) => layer.route?.path === "/register").route.stack.at(-1).handle;
   const response = await invoke(handler, {
@@ -26,7 +27,9 @@ test("registerUser normalizes the email, grants the wearable project, and signs 
 
   assert.equal(response.statusCode, 201);
   assert.equal(calls[0].email, "test@example.com");
-  assert.equal(calls[0].defaultProjectCode, "wearable-monitoring");
+  assert.equal(calls[0].defaultGroupCode, "default");
+  assert.equal(calls[0].defaultProjectCode, undefined);
+  assert.equal(calls[0].isAdmin, true);
   assert.equal(calls[1].signedIn, calls[0].id);
 });
 

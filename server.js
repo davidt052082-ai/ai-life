@@ -10,9 +10,11 @@ import { CollectorError, toErrorResponse } from "./src/product-collector/errors.
 import { collectProductFromUrl as defaultCollectProductFromUrl } from "./src/product-collector/index.js";
 import { createBrowserProductCollector } from "./src/product-collector/browserCollector.js";
 import { createUserRepository } from "./src/repositories/userRepository.js";
+import { createAdminRepository } from "./src/repositories/adminRepository.js";
 import { createWearableRepository } from "./src/repositories/wearableRepository.js";
 import { createAuthRouter } from "./src/routes/authRoutes.js";
 import { createProjectRouter } from "./src/routes/projectRoutes.js";
+import { createAdminRouter } from "./src/routes/adminRoutes.js";
 import { createWearableRouter } from "./src/routes/wearableRoutes.js";
 import { renderShareImagePng as defaultRenderShareImagePng } from "./src/shareImage.js";
 
@@ -27,6 +29,8 @@ export function createApp(options = {}) {
   const connectionString = options.disableDatabase ? null : (options.databaseUrl || process.env.DATABASE_URL);
   const pool = options.pool || (connectionString ? createDatabasePool(connectionString) : null);
   const userRepository = options.userRepository || (pool ? createUserRepository(pool) : null);
+  const adminRepository = options.adminRepository || (pool ? createAdminRepository(pool) : null);
+  const adminEmail = options.adminEmail ?? process.env.ADMIN_EMAIL ?? "";
   const wearableRepository = options.wearableRepository || (pool ? createWearableRepository(pool) : null);
   const sessionService = options.sessionService || (userRepository
     ? createSessionService(userRepository, options.sessionOptions)
@@ -40,9 +44,11 @@ export function createApp(options = {}) {
     app.use("/api/auth", createAuthRouter({
       repository: userRepository,
       sessionService,
-      defaultProjectCode: WEARABLE_PROJECT_CODE
+      defaultGroupCode: "default",
+      adminEmail
     }));
     app.use("/api/projects", createProjectRouter({ repository: userRepository, sessionService }));
+    app.use("/api/admin", createAdminRouter({ repository: adminRepository, sessionService, adminEmail }));
     app.use("/api/projects/:code/wearable", createWearableRouter({
       repository: wearableRepository,
       projectRepository: userRepository,
@@ -54,6 +60,9 @@ export function createApp(options = {}) {
       res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
     });
     app.use("/api/projects", (_req, res) => {
+      res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
+    });
+    app.use("/api/admin", (_req, res) => {
       res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
     });
   }
@@ -134,6 +143,9 @@ export function createApp(options = {}) {
   app.get("/register", (_req, res) => {
     res.sendFile(path.join(__dirname, "register.html"));
   });
+  app.get("/admin", (_req, res) => {
+    res.sendFile(path.join(__dirname, "admin.html"));
+  });
   app.get("/", (_req, res) => {
     res.sendFile(path.join(__dirname, "project-home.html"));
   });
@@ -141,12 +153,24 @@ export function createApp(options = {}) {
     res.sendFile(path.join(__dirname, "index.html"));
   });
 
+  app.locals.syncConfiguredAdmin = async () => {
+    if (adminRepository && String(adminEmail).trim()) {
+      await adminRepository.syncConfiguredAdmin(adminEmail);
+    }
+  };
+
   return app;
 }
 
 if (process.argv[1] === __filename) {
   const port = Number(process.env.PORT || 5173);
-  createApp().listen(port, () => {
+  const app = createApp();
+  try {
+    await app.locals.syncConfiguredAdmin();
+  } catch (error) {
+    console.error("Unable to synchronize configured administrator:", error);
+  }
+  app.listen(port, () => {
     console.log(`AI Life wearable collector running at http://localhost:${port}`);
   });
 }

@@ -26,3 +26,17 @@ export function requireProjectAccess(repository) {
     next();
   };
 }
+
+export function requireAdmin({ adminEmail }) {
+  return (req, res, next) => {
+    if (!String(adminEmail || "").trim()) {
+      res.status(503).json({ error: "ADMIN_NOT_CONFIGURED", message: "尚未配置管理员账号。" });
+      return;
+    }
+    if (!req.user?.isAdmin) {
+      res.status(403).json({ error: "ADMIN_REQUIRED", message: "需要管理员权限。" });
+      return;
+    }
+    next();
+  };
+}
