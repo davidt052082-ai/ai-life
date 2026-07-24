@@ -13,6 +13,8 @@ test("project pages provide login, registration, and an authorization-driven dir
   assert.match(register, /\/api\/auth\/register/);
   assert.match(home, /\/api\/auth\/me/);
   assert.match(home, /\/api\/projects/);
+  assert.match(home, /me\.user\.isAdmin/);
+  assert.match(home, /href="\/admin"/);
   assert.doesNotMatch(home, /新建项目|删除项目|编辑项目/);
 });
 

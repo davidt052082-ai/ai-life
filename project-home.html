@@ -17,6 +17,7 @@
     .auth-links { display: flex; align-items: center; gap: 10px; }
     .auth-links a { border: 1px solid rgba(69,232,255,.52); border-radius: 6px; padding: 8px 12px; color: #c4f8ff; text-decoration: none; }
     .auth-links a:last-child { border-color: rgba(255,159,53,.72); color: #ffe7d1; }
+    .admin-link { border: 1px solid rgba(69,232,255,.7); border-radius: 6px; padding: 8px 12px; color: #c4f8ff; background: rgba(10, 58, 72, .35); text-decoration: none; }
     .logout { border: 1px solid rgba(255,159,53,.72); border-radius: 6px; padding: 8px 12px; color: #ffe7d1; background: rgba(92,45,12,.4); font: inherit; cursor: pointer; }
     main { padding-top: 32px; }
     .project-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
@@ -35,7 +36,7 @@
   <div class="page">
     <header>
       <div><p class="eyebrow">AI LIFE / PROJECT DIRECTORY</p><h1>项目首页</h1><p class="copy">选择一个已获授权的项目进入。</p></div>
-      <div class="account"><span id="accountName">正在加载...</span><div id="authLinks" class="auth-links" hidden><a href="/login">登录</a><a href="/register">注册</a></div><button id="logoutButton" class="logout" type="button">退出登录</button></div>
+      <div class="account"><span id="accountName">正在加载...</span><div id="authLinks" class="auth-links" hidden><a href="/login">登录</a><a href="/register">注册</a></div><a id="adminLink" class="admin-link" href="/admin" hidden>后台管理</a><button id="logoutButton" class="logout" type="button">退出登录</button></div>
     </header>
     <main><div id="projectGrid" class="project-grid" aria-live="polite"></div></main>
   </div>
@@ -43,6 +44,7 @@
     const projectGrid = document.getElementById("projectGrid");
     const accountName = document.getElementById("accountName");
     const authLinks = document.getElementById("authLinks");
+    const adminLink = document.getElementById("adminLink");
     const logoutButton = document.getElementById("logoutButton");
     const guestProjects = [{
       name: "智能穿戴监测系统",
@@ -63,6 +65,7 @@
     function renderGuestProjects() {
       accountName.textContent = "游客模式 · 数据仅保存在此浏览器";
       authLinks.hidden = false;
+      adminLink.hidden = true;
       logoutButton.hidden = true;
       renderProjects(guestProjects);
     }
@@ -73,6 +76,7 @@
       const me = await meResponse.json();
       accountName.textContent = me.user.displayName || me.user.email;
       authLinks.hidden = true;
+      adminLink.hidden = !me.user.isAdmin;
       logoutButton.hidden = false;
       const projectResponse = await fetch("/api/projects");
       const data = await projectResponse.json();
