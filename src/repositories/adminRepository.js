@@ -22,6 +22,7 @@ function toAdminGroup(row) {
     name: row.name,
     description: row.description,
     isDefault: Boolean(row.is_default),
+    isSystem: Boolean(row.is_system),
     createdAt: row.created_at,
     memberCount: Number(row.member_count || 0),
     projectIds: row.project_ids || []
@@ -42,12 +43,16 @@ function toAdminProject(row) {
 
 async function requireGroup(client, groupId, { lock = false } = {}) {
   const result = await client.query(
-    `SELECT id, code, name, description, is_default, created_at
+    `SELECT id, code, name, description, is_default, is_system, created_at
      FROM groups WHERE id = $1${lock ? " FOR UPDATE" : ""}`,
     [groupId]
   );
   if (!result.rows[0]) throw createRepositoryError("NOT_FOUND", "分组不存在。");
   return result.rows[0];
+}
+
+function requireManualChangeAllowed(group) {
+  if (group.is_system) throw createRepositoryError("GROUP_PROTECTED", "管理组由系统自动维护。");
 }
 
 async function requireExisting(client, table, id, message) {
@@ -68,7 +73,7 @@ const userListSql = `
 `;
 
 const groupListSql = `
-  SELECT g.id, g.code, g.name, g.description, g.is_default, g.created_at,
+  SELECT g.id, g.code, g.name, g.description, g.is_default, g.is_system, g.created_at,
          COUNT(DISTINCT ug.user_id)::int AS member_count,
          COALESCE(jsonb_agg(DISTINCT gpa.project_id) FILTER (WHERE gpa.project_id IS NOT NULL AND gpa.is_enabled), '[]'::jsonb) AS project_ids
   FROM groups g
@@ -120,7 +125,7 @@ export function createAdminRepository(pool) {
       const result = await pool.query(
         `INSERT INTO groups (id, code, name, description)
          VALUES ($1, $2, $3, $4)
-         RETURNING id, code, name, description, is_default, created_at`,
+         RETURNING id, code, name, description, is_default, is_system, created_at`,
         [id, code, name, description]
       );
       return toAdminGroup({ ...result.rows[0], member_count: 0, project_ids: [] });
@@ -131,10 +136,11 @@ export function createAdminRepository(pool) {
       try {
         await client.query("BEGIN");
         const group = await requireGroup(client, groupId, { lock: true });
+        requireManualChangeAllowed(group);
         if (group.is_default) throw createRepositoryError("GROUP_PROTECTED", "默认分组不能修改。");
         const result = await client.query(
           `UPDATE groups SET name = $2, description = $3 WHERE id = $1
-           RETURNING id, code, name, description, is_default, created_at`,
+           RETURNING id, code, name, description, is_default, is_system, created_at`,
           [groupId, name, description]
         );
         await client.query("COMMIT");
@@ -152,6 +158,7 @@ export function createAdminRepository(pool) {
       try {
         await client.query("BEGIN");
         const group = await requireGroup(client, groupId, { lock: true });
+        requireManualChangeAllowed(group);
         if (group.is_default) throw createRepositoryError("GROUP_PROTECTED", "默认分组不能删除。");
         const usage = await client.query(
           `SELECT
@@ -176,7 +183,8 @@ export function createAdminRepository(pool) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        await requireGroup(client, groupId, { lock: true });
+        const group = await requireGroup(client, groupId, { lock: true });
+        requireManualChangeAllowed(group);
         await requireExisting(client, "users", userId, "用户不存在。");
         await client.query("INSERT INTO user_groups (user_id, group_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [userId, groupId]);
         await client.query("COMMIT");
@@ -193,6 +201,7 @@ export function createAdminRepository(pool) {
       try {
         await client.query("BEGIN");
         const group = await requireGroup(client, groupId, { lock: true });
+        requireManualChangeAllowed(group);
         if (group.is_default) throw createRepositoryError("GROUP_PROTECTED", "默认分组成员不能移除。");
         await requireExisting(client, "users", userId, "用户不存在。");
         await client.query("DELETE FROM user_groups WHERE user_id = $1 AND group_id = $2", [userId, groupId]);
@@ -209,7 +218,8 @@ export function createAdminRepository(pool) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        await requireGroup(client, groupId, { lock: true });
+        const group = await requireGroup(client, groupId, { lock: true });
+        requireManualChangeAllowed(group);
         await requireExisting(client, "projects", projectId, "项目不存在。");
         await client.query(
           `INSERT INTO group_project_access (group_id, project_id, is_enabled)
@@ -231,6 +241,7 @@ export function createAdminRepository(pool) {
       try {
         await client.query("BEGIN");
         const group = await requireGroup(client, groupId, { lock: true });
+        requireManualChangeAllowed(group);
         const projectResult = await client.query("SELECT id, code FROM projects WHERE id = $1", [projectId]);
         if (!projectResult.rows[0]) throw createRepositoryError("NOT_FOUND", "项目不存在。");
         if (group.is_default && projectResult.rows[0].code === "wearable-monitoring") {

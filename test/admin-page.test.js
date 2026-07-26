@@ -21,3 +21,19 @@ test("admin page remains reachable while its API reports an unavailable database
   assert.ok(pageRoute);
   assert.ok(unavailableApi);
 });
+
+test("admin page marks system groups as read-only", async () => {
+  const html = await fs.readFile(new URL("../admin.html", import.meta.url), "utf8");
+
+  assert.match(html, /isSystem/);
+  assert.match(html, /系统维护/);
+  assert.match(html, /protectedGroup/);
+});
+
+test("README explains automatic management-group authorization", async () => {
+  const readme = await fs.readFile(new URL("../README.md", import.meta.url), "utf8");
+
+  assert.match(readme, /管理组/);
+  assert.match(readme, /管理员身份自动加入或移出/);
+  assert.match(readme, /所有现有及未来项目/);
+});
