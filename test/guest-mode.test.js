@@ -27,3 +27,10 @@ test("wearable page separates guest local storage from account API synchronizati
   assert.match(html, /storageMode !== "account"/);
   assert.match(html, /async function initializeAccountProject\(\)/);
 });
+
+test("README documents group-controlled study-plan synchronization", async () => {
+  const readme = await fs.readFile(new URL("../README.md", import.meta.url), "utf8");
+
+  assert.match(readme, /学习计划日历不属于默认分组/);
+  assert.match(readme, /手机和电脑登录同一账号即可同步/);
+});

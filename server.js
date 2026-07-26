@@ -5,17 +5,19 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createSessionService } from "./src/auth/session.js";
 import { createDatabasePool } from "./src/db/pool.js";
-import { WEARABLE_PROJECT_CODE } from "./src/db/migrate.js";
+import { STUDY_PLAN_PROJECT_CODE, WEARABLE_PROJECT_CODE } from "./src/db/migrate.js";
 import { CollectorError, toErrorResponse } from "./src/product-collector/errors.js";
 import { collectProductFromUrl as defaultCollectProductFromUrl } from "./src/product-collector/index.js";
 import { createBrowserProductCollector } from "./src/product-collector/browserCollector.js";
 import { createUserRepository } from "./src/repositories/userRepository.js";
 import { createAdminRepository } from "./src/repositories/adminRepository.js";
 import { createWearableRepository } from "./src/repositories/wearableRepository.js";
+import { createStudyPlanRepository } from "./src/repositories/studyPlanRepository.js";
 import { createAuthRouter } from "./src/routes/authRoutes.js";
 import { createProjectRouter } from "./src/routes/projectRoutes.js";
 import { createAdminRouter } from "./src/routes/adminRoutes.js";
 import { createWearableRouter } from "./src/routes/wearableRoutes.js";
+import { createStudyPlanRouter } from "./src/routes/studyPlanRoutes.js";
 import { renderShareImagePng as defaultRenderShareImagePng } from "./src/shareImage.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +34,7 @@ export function createApp(options = {}) {
   const adminRepository = options.adminRepository || (pool ? createAdminRepository(pool) : null);
   const adminEmail = options.adminEmail ?? process.env.ADMIN_EMAIL ?? "";
   const wearableRepository = options.wearableRepository || (pool ? createWearableRepository(pool) : null);
+  const studyPlanRepository = options.studyPlanRepository || (pool ? createStudyPlanRepository(pool) : null);
   const sessionService = options.sessionService || (userRepository
     ? createSessionService(userRepository, options.sessionOptions)
     : null);
@@ -55,6 +58,12 @@ export function createApp(options = {}) {
       sessionService,
       wearableProjectCode: WEARABLE_PROJECT_CODE
     }));
+    app.use("/api/projects/:code/study-plans", createStudyPlanRouter({
+      repository: studyPlanRepository,
+      projectRepository: userRepository,
+      sessionService,
+      studyPlanProjectCode: STUDY_PLAN_PROJECT_CODE
+    }));
   } else {
     app.use("/api/auth", (_req, res) => {
       res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
@@ -63,6 +72,9 @@ export function createApp(options = {}) {
       res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
     });
     app.use("/api/admin", (_req, res) => {
+      res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
+    });
+    app.use("/api/projects/:code/study-plans", (_req, res) => {
       res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
     });
   }
@@ -151,6 +163,29 @@ export function createApp(options = {}) {
   });
   app.get("/projects/wearable", (_req, res) => {
     res.sendFile(path.join(__dirname, "index.html"));
+  });
+  app.get("/projects/study-plan", async (req, res, next) => {
+    try {
+      const user = await sessionService?.getCurrentUser(req);
+      if (!user) {
+        res.redirect("/login?next=/projects/study-plan");
+        return;
+      }
+      const project = await userRepository?.findProjectAccess({ userId: user.id, projectCode: STUDY_PLAN_PROJECT_CODE });
+      if (!project) {
+        res.redirect("/");
+        return;
+      }
+      res.sendFile(path.join(__dirname, "study-plan.html"));
+    } catch (error) {
+      next(error);
+    }
+  });
+  app.get("/study-plan/schedule.js", (_req, res) => {
+    res.sendFile(path.join(__dirname, "src", "study-plan", "schedule.js"));
+  });
+  app.get("/study-plan-client.js", (_req, res) => {
+    res.sendFile(path.join(__dirname, "study-plan-client.js"));
   });
 
   app.locals.syncConfiguredAdmin = async () => {

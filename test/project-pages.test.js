@@ -26,3 +26,13 @@ test("wearable page loads account-scoped state and offers the project home link"
   assert.match(html, /migrate-local-data/);
   assert.match(html, /返回项目首页/);
 });
+
+test("study plan page and shared schedule module are registered", async () => {
+  const { createApp } = await import("../server.js");
+  const app = createApp({ disableDatabase: true });
+  const paths = app._router.stack.filter((layer) => layer.route).map((layer) => layer.route.path);
+
+  assert.ok(paths.includes("/projects/study-plan"));
+  assert.ok(paths.includes("/study-plan/schedule.js"));
+  assert.ok(paths.includes("/study-plan-client.js"));
+});

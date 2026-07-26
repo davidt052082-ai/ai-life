@@ -24,6 +24,7 @@ test("listMigrationFiles returns SQL files in lexical order", async () => {
   assert.deepEqual(files, [
     "001_initial_schema.sql",
     "002_scope_wearable_record_ids.sql",
-    "003_group_based_project_access.sql"
+    "003_group_based_project_access.sql",
+    "004_study_plan_project.sql"
   ]);
 });

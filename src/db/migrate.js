@@ -7,6 +7,8 @@ const defaultMigrationsDir = path.resolve(__dirname, "../../db/migrations");
 
 export const WEARABLE_PROJECT_ID = "d3cc3af9-cd25-477e-a16e-50c957f1650f";
 export const WEARABLE_PROJECT_CODE = "wearable-monitoring";
+export const STUDY_PLAN_PROJECT_ID = "b406a418-20d1-4c15-a797-33ad4c904492";
+export const STUDY_PLAN_PROJECT_CODE = "study-plan";
 
 export function validateDatabaseUrl(connectionString) {
   if (typeof connectionString !== "string" || !/^postgres(?:ql)?:\/\//i.test(connectionString)) {
