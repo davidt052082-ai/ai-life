@@ -11,7 +11,8 @@ function toStudyPlan(row) {
   if (!row) return null;
   return {
     id: row.id,
-    student: row.student,
+    personId: row.person_id,
+    personName: row.person_name,
     subject: row.subject,
     location: row.location,
     startDate: toIsoDate(row.start_date),
@@ -25,7 +26,9 @@ function toStudyPlan(row) {
   };
 }
 
-const PLAN_FIELDS = `id, student, subject, location, start_date, start_time, end_time,
+const PLAN_FIELDS = `sp.id, sp.person_id, p.name AS person_name, sp.subject, sp.location, sp.start_date, sp.start_time, sp.end_time,
+  sp.study_days, sp.rest_days, sp.target_study_days, sp.created_at, sp.updated_at`;
+const INSERT_PLAN_FIELDS = `id, person_id, subject, location, start_date, start_time, end_time,
   study_days, rest_days, target_study_days, created_at, updated_at`;
 
 export function createStudyPlanRepository(pool) {
@@ -33,9 +36,10 @@ export function createStudyPlanRepository(pool) {
     async listPlans({ userId, projectId }) {
       const result = await pool.query(
         `SELECT ${PLAN_FIELDS}
-         FROM study_plans
-         WHERE user_id = $1 AND project_id = $2
-         ORDER BY start_date ASC, start_time ASC, created_at ASC`,
+         FROM study_plans sp
+         JOIN study_people p ON p.id = sp.person_id AND p.user_id = sp.user_id AND p.project_id = sp.project_id
+         WHERE sp.user_id = $1 AND sp.project_id = $2
+         ORDER BY sp.start_date ASC, sp.start_time ASC, sp.created_at ASC`,
         [userId, projectId]
       );
       return result.rows.map(toStudyPlan);
@@ -44,12 +48,12 @@ export function createStudyPlanRepository(pool) {
     async createPlan({ id, userId, projectId, plan }) {
       const result = await pool.query(
         `INSERT INTO study_plans (
-           id, user_id, project_id, student, subject, location,
+           id, user_id, project_id, person_id, subject, location,
            start_date, start_time, end_time, study_days, rest_days, target_study_days
          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-         RETURNING ${PLAN_FIELDS}`,
+         RETURNING ${INSERT_PLAN_FIELDS}`,
         [
-          id, userId, projectId, plan.student, plan.subject, plan.location,
+          id, userId, projectId, plan.personId, plan.subject, plan.location,
           plan.startDate, plan.startTime, plan.endTime,
           plan.studyDays, plan.restDays, plan.targetStudyDays
         ]

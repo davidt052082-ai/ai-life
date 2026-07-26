@@ -13,11 +13,13 @@ import { createUserRepository } from "./src/repositories/userRepository.js";
 import { createAdminRepository } from "./src/repositories/adminRepository.js";
 import { createWearableRepository } from "./src/repositories/wearableRepository.js";
 import { createStudyPlanRepository } from "./src/repositories/studyPlanRepository.js";
+import { createStudyPeopleRepository } from "./src/repositories/studyPeopleRepository.js";
 import { createAuthRouter } from "./src/routes/authRoutes.js";
 import { createProjectRouter } from "./src/routes/projectRoutes.js";
 import { createAdminRouter } from "./src/routes/adminRoutes.js";
 import { createWearableRouter } from "./src/routes/wearableRoutes.js";
 import { createStudyPlanRouter } from "./src/routes/studyPlanRoutes.js";
+import { createStudyPeopleRouter } from "./src/routes/studyPeopleRoutes.js";
 import { renderShareImagePng as defaultRenderShareImagePng } from "./src/shareImage.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,6 +37,7 @@ export function createApp(options = {}) {
   const adminEmail = options.adminEmail ?? process.env.ADMIN_EMAIL ?? "";
   const wearableRepository = options.wearableRepository || (pool ? createWearableRepository(pool) : null);
   const studyPlanRepository = options.studyPlanRepository || (pool ? createStudyPlanRepository(pool) : null);
+  const studyPeopleRepository = options.studyPeopleRepository || (pool ? createStudyPeopleRepository(pool) : null);
   const sessionService = options.sessionService || (userRepository
     ? createSessionService(userRepository, options.sessionOptions)
     : null);
@@ -60,6 +63,13 @@ export function createApp(options = {}) {
     }));
     app.use("/api/projects/:code/study-plans", createStudyPlanRouter({
       repository: studyPlanRepository,
+      peopleRepository: studyPeopleRepository,
+      projectRepository: userRepository,
+      sessionService,
+      studyPlanProjectCode: STUDY_PLAN_PROJECT_CODE
+    }));
+    app.use("/api/projects/:code/study-plans/people", createStudyPeopleRouter({
+      repository: studyPeopleRepository,
       projectRepository: userRepository,
       sessionService,
       studyPlanProjectCode: STUDY_PLAN_PROJECT_CODE

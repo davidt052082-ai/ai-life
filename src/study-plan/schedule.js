@@ -1,5 +1,3 @@
-export const STUDENTS = ["大公主", "小公主"];
-
 function isIsoDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00`);
@@ -17,7 +15,7 @@ export function toIsoDate(date) {
 }
 
 export function validatePlanInput(plan) {
-  if (!STUDENTS.includes(plan?.student)) return "请选择学习者。";
+  if (typeof plan?.personId !== "string" || !plan.personId.trim()) return "请选择人物。";
   if (![plan.subject, plan.location].every((value) => typeof value === "string" && value.trim())) return "请完整填写计划信息。";
   if (!isIsoDate(plan.startDate) || !isTime(plan.startTime) || !isTime(plan.endTime)) return "日期或时间格式无效。";
   if (plan.subject.trim().length > 30 || plan.location.trim().length > 50) return "科目或地点内容过长。";

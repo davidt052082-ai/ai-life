@@ -4,7 +4,7 @@ import { expandPlan, isRestDate, sortEvents, validatePlanInput } from "../src/st
 
 const basePlan = {
   id: "p-1",
-  student: "大公主",
+  personId: "person-a",
   subject: "数学",
   location: "书房",
   startDate: "2026-07-10",
@@ -41,5 +41,5 @@ test("invalid plan fields return an API-safe Chinese error", () => {
   assert.equal(validatePlanInput(basePlan), "");
   assert.match(validatePlanInput({ ...basePlan, endTime: "15:30" }), /结束时间/);
   assert.match(validatePlanInput({ ...basePlan, studyDays: 0 }), /至少为 1/);
-  assert.match(validatePlanInput({ ...basePlan, student: "其他" }), /学习者/);
+  assert.match(validatePlanInput({ ...basePlan, personId: "" }), /人物/);
 });

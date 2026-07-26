@@ -12,13 +12,13 @@ function inputError(message) {
 
 function readPlanInput(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) throw inputError("请求数据格式无效。");
-  const stringFields = ["student", "subject", "location", "startDate", "startTime", "endTime"];
+  const stringFields = ["personId", "subject", "location", "startDate", "startTime", "endTime"];
   if (stringFields.some((field) => typeof body[field] !== "string")) throw inputError("请求数据格式无效。");
   const numberFields = ["studyDays", "restDays", "targetStudyDays"];
   if (numberFields.some((field) => !Number.isInteger(body[field]))) throw inputError("学习与休息天数必须为整数。");
 
   const plan = {
-    student: body.student,
+    personId: body.personId,
     subject: body.subject.trim(),
     location: body.location.trim(),
     startDate: body.startDate,
@@ -52,7 +52,7 @@ function route(handler) {
   };
 }
 
-export function createStudyPlanRouter({ repository, projectRepository = repository, sessionService, studyPlanProjectCode }) {
+export function createStudyPlanRouter({ repository, peopleRepository, projectRepository = repository, sessionService, studyPlanProjectCode }) {
   const router = Router({ mergeParams: true });
   router.use(requireUser(sessionService));
   router.use(requireProjectAccess(projectRepository));
@@ -71,6 +71,8 @@ export function createStudyPlanRouter({ repository, projectRepository = reposito
 
   router.post("/", route(async (req, res) => {
     const plan = readPlanInput(req.body);
+    const person = await peopleRepository.findPerson({ id: plan.personId, userId: req.user.id, projectId: req.project.id });
+    if (!person) throw inputError("请选择当前账号的人物。");
     const created = await repository.createPlan({
       id: randomUUID(),
       userId: req.user.id,

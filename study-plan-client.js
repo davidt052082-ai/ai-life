@@ -1,287 +1,31 @@
-import { STUDENTS, expandPlan, isRestDate, sortEvents, toIsoDate, validatePlanInput } from "/study-plan/schedule.js";
+import { expandPlan, isRestDate, sortEvents, toIsoDate, validatePlanInput } from "/study-plan/schedule.js";
 
 const API_ROOT = "/api/projects/study-plan/study-plans";
-const state = {
-  view: "overview",
-  month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  plans: []
-};
-
-const content = document.querySelector("#app-content");
-const dialog = document.querySelector("#plan-dialog");
-const form = document.querySelector("#plan-form");
-const formError = document.querySelector("#form-error");
-const saveButton = document.querySelector("#save-plan");
-const status = document.querySelector("#sync-status");
-
-function setStatus(message = "", error = false) {
-  status.textContent = message;
-  status.classList.toggle("error", error);
-}
-
-function escapeHtml(value) {
-  return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[character]);
-}
-
-function studentClass(student) {
-  return student === "大公主" ? "rose" : "blue";
-}
-
-function monthKey(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function monthLabel(date) {
-  return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月`;
-}
-
-function durationMinutes(startTime, endTime) {
-  const [startHour, startMinute] = startTime.split(":").map(Number);
-  const [endHour, endMinute] = endTime.split(":").map(Number);
-  return endHour * 60 + endMinute - startHour * 60 - startMinute;
-}
-
-function formatHours(minutes) {
-  const hours = minutes / 60;
-  return Number.isInteger(hours) ? `${hours} 小时` : `${hours.toFixed(1)} 小时`;
-}
-
-async function apiFetch(path = "", options = {}) {
-  const response = await fetch(`${API_ROOT}${path}`, {
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options
-  });
-  if (response.status === 401) {
-    window.location.assign("/login?next=/projects/study-plan");
-    throw new Error("请先登录。");
-  }
-  if (response.status === 403) {
-    window.location.assign("/");
-    throw new Error("你没有访问此项目的权限。");
-  }
-  return response;
-}
-
-async function responseMessage(response, fallback) {
-  const payload = await response.json().catch(() => ({}));
-  return payload.message || fallback;
-}
-
-function allEvents() {
-  return sortEvents(state.plans.flatMap(expandPlan));
-}
-
-function visibleEvents(student = "") {
-  return allEvents().filter((event) => event.date.startsWith(monthKey(state.month)) && (!student || event.student === student));
-}
-
-function metricCard(accent, label, value, note) {
-  return `<article class="metric-card ${accent}"><div class="metric-label">${label}</div><div class="metric-value">${value}</div><div class="metric-note">${note}</div></article>`;
-}
-
-function planCard(plan) {
-  const accent = studentClass(plan.student);
-  return `<article class="plan-card ${accent}">
-    <button class="delete-plan" type="button" data-delete-plan="${escapeHtml(plan.id)}" aria-label="删除 ${escapeHtml(plan.subject)} 计划">×</button>
-    <h3><span class="student-tag ${accent}">${escapeHtml(plan.student)}</span> ${escapeHtml(plan.subject)}</h3>
-    <p>${escapeHtml(plan.startDate)} 起 · 学 ${plan.studyDays} 天／休 ${plan.restDays} 天 · 共 ${plan.targetStudyDays} 个学习日</p>
-    <div class="tag-row"><span class="tag">${escapeHtml(plan.startTime)}–${escapeHtml(plan.endTime)}</span><span class="tag">${escapeHtml(plan.location)}</span></div>
-  </article>`;
-}
-
-function eventChip(event) {
-  const accent = studentClass(event.student);
-  const title = `${event.student} · ${event.subject} · ${event.startTime}–${event.endTime} · ${event.location}`;
-  return `<span class="event-chip ${accent}" title="${escapeHtml(title)}">${escapeHtml(event.startTime)} ${escapeHtml(event.subject)}</span>`;
-}
-
-function restNotes(isoDate, student = "") {
-  return state.plans
-    .filter((plan) => (!student || plan.student === student) && isRestDate(plan, isoDate))
-    .map((plan) => `<div class="rest-note">${student ? "休息日" : `${escapeHtml(plan.student)} · 休息日`}</div>`)
-    .join("");
-}
-
-function renderCalendar(events, student = "") {
-  const monthStart = new Date(state.month.getFullYear(), state.month.getMonth(), 1);
-  const offset = (monthStart.getDay() + 6) % 7;
-  const gridStart = new Date(monthStart);
-  gridStart.setDate(1 - offset);
-  const eventMap = new Map();
-  for (const event of events) {
-    const onDate = eventMap.get(event.date) || [];
-    onDate.push(event);
-    eventMap.set(event.date, onDate);
-  }
-  const today = toIsoDate(new Date());
-  const days = [];
-  for (let index = 0; index < 42; index += 1) {
-    const date = new Date(gridStart);
-    date.setDate(gridStart.getDate() + index);
-    const isoDate = toIsoDate(date);
-    const inMonth = date.getMonth() === state.month.getMonth();
-    days.push(`<div class="day ${inMonth ? "" : "muted"} ${isoDate === today ? "today" : ""}">
-      <span class="day-number">${date.getDate()}</span>
-      ${(eventMap.get(isoDate) || []).map(eventChip).join("")}
-      ${restNotes(isoDate, student)}
-    </div>`);
-  }
-  return `<div class="month-controls"><h2 class="month-title">${monthLabel(state.month)}</h2><div class="month-actions">
-    <button class="month-button" type="button" data-month-change="-1" aria-label="上个月">‹</button>
-    <button class="month-button" type="button" data-month-change="0" aria-label="本月">·</button>
-    <button class="month-button" type="button" data-month-change="1" aria-label="下个月">›</button>
-  </div></div>
-  <div class="weekdays"><span class="weekday">一</span><span class="weekday">二</span><span class="weekday">三</span><span class="weekday">四</span><span class="weekday">五</span><span class="weekday">六</span><span class="weekday">日</span></div>
-  <div class="calendar-grid">${days.join("")}</div>
-  <div class="calendar-legend"><span><i class="legend-dot rose"></i>大公主</span><span><i class="legend-dot blue"></i>小公主</span><span>灰字：休息日</span></div>`;
-}
-
-function renderEmpty() {
-  return `<section class="empty-state"><div><div class="empty-icon">🗓️</div><h2>把第一条学习计划写下来</h2><p>填写科目、地点和“学习几天／休息几天”，系统会自动把整段计划放进日历。</p><button class="primary-button" data-open-dialog type="button">＋ 新增计划</button></div></section>`;
-}
-
-function renderDashboard(events, student) {
-  const monthEvents = visibleEvents();
-  const visiblePlans = state.plans
-    .filter((plan) => !student || plan.student === student)
-    .sort((left, right) => left.startDate.localeCompare(right.startDate) || left.startTime.localeCompare(right.startTime));
-  const bigDays = new Set(monthEvents.filter((event) => event.student === "大公主").map((event) => event.date)).size;
-  const smallDays = new Set(monthEvents.filter((event) => event.student === "小公主").map((event) => event.date)).size;
-  const minutes = events.reduce((total, event) => total + durationMinutes(event.startTime, event.endTime), 0);
-  const personMetric = student === "大公主"
-    ? metricCard("rose", "大公主 · 本月学习日", `${bigDays} 天`, `本月 ${events.length} 节课程`)
-    : student === "小公主"
-      ? metricCard("blue", "小公主 · 本月学习日", `${smallDays} 天`, `本月 ${events.length} 节课程`)
-      : `${metricCard("rose", "大公主 · 本月学习日", `${bigDays} 天`, `本月 ${monthEvents.filter((event) => event.student === "大公主").length} 节课程`)}${metricCard("blue", "小公主 · 本月学习日", `${smallDays} 天`, `本月 ${monthEvents.filter((event) => event.student === "小公主").length} 节课程`)}`;
-  const heading = student ? `${student}的学习计划` : "本月学习总览";
-  return `<section class="summary-grid">${personMetric}${metricCard("gold", student ? "本月课程时长" : "两人合计课程时长", formatHours(minutes), `${monthLabel(state.month)}已排 ${events.length} 节`)}</section>
-  <section class="content-grid"><section class="panel"><div class="panel-header"><h2 class="panel-title">${heading}</h2><span class="panel-hint">${visiblePlans.length} 条计划</span></div><div class="plan-list">${visiblePlans.map(planCard).join("")}</div></section><section class="panel">${renderCalendar(events, student)}</section></section>`;
-}
-
-function render() {
-  document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.view === state.view));
-  if (!state.plans.length) {
-    content.innerHTML = renderEmpty();
-    return;
-  }
-  const student = STUDENTS.includes(state.view) ? state.view : "";
-  const events = visibleEvents(student);
-  content.innerHTML = state.view === "calendar"
-    ? `<section class="panel">${renderCalendar(events)}</section>`
-    : renderDashboard(events, student);
-}
-
-function openDialog() {
-  form.reset();
-  document.querySelector("#start-date").value = toIsoDate(new Date());
-  formError.textContent = "";
-  dialog.showModal();
-  document.querySelector("#subject").focus();
-}
-
-function readFormPlan() {
-  const data = new FormData(form);
-  return {
-    student: data.get("student"),
-    subject: String(data.get("subject") || "").trim(),
-    location: String(data.get("location") || "").trim(),
-    startDate: data.get("startDate"),
-    startTime: data.get("startTime"),
-    endTime: data.get("endTime"),
-    studyDays: Number(data.get("studyDays")),
-    restDays: Number(data.get("restDays")),
-    targetStudyDays: Number(data.get("targetStudyDays"))
-  };
-}
-
-async function loadPlans() {
-  setStatus("正在加载云端计划…");
-  const response = await apiFetch();
-  if (!response.ok) throw new Error(await responseMessage(response, "无法读取学习计划，请稍后重试。"));
-  const payload = await response.json();
-  state.plans = Array.isArray(payload.plans) ? payload.plans : [];
-  setStatus("");
-  render();
-}
-
-async function createPlan() {
-  const plan = readFormPlan();
-  const validation = validatePlanInput(plan);
-  if (validation) {
-    formError.textContent = validation;
-    return;
-  }
-  formError.textContent = "";
-  saveButton.disabled = true;
-  saveButton.textContent = "正在保存…";
-  try {
-    const response = await apiFetch("", { method: "POST", body: JSON.stringify(plan) });
-    if (!response.ok) throw new Error(await responseMessage(response, "学习计划保存失败，请稍后重试。"));
-    const payload = await response.json();
-    state.plans.push(payload.plan);
-    dialog.close();
-    setStatus("同步完成");
-    render();
-  } catch (error) {
-    formError.textContent = error.message;
-    setStatus("同步失败，计划尚未保存。", true);
-  } finally {
-    saveButton.disabled = false;
-    saveButton.textContent = "保存计划";
-  }
-}
-
-async function deletePlan(id) {
-  const plan = state.plans.find((item) => item.id === id);
-  if (!plan || !window.confirm(`删除“${plan.subject}”计划及其所有生成课程？`)) return;
-  try {
-    const response = await apiFetch(`/${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (!response.ok) throw new Error(await responseMessage(response, "学习计划删除失败，请稍后重试。"));
-    state.plans = state.plans.filter((item) => item.id !== id);
-    setStatus("同步完成");
-    render();
-  } catch (error) {
-    setStatus(error.message, true);
-  }
-}
-
-document.querySelector("#open-plan-dialog").addEventListener("click", openDialog);
-document.querySelector("#close-plan-dialog").addEventListener("click", () => dialog.close());
-document.querySelector("#cancel-plan").addEventListener("click", () => dialog.close());
-form.addEventListener("submit", (event) => {
-  event.preventDefault();
-  createPlan();
-});
-document.addEventListener("click", (event) => {
-  const tab = event.target.closest("[data-view]");
-  if (tab) {
-    state.view = tab.dataset.view;
-    render();
-    return;
-  }
-  if (event.target.closest("[data-open-dialog]")) {
-    openDialog();
-    return;
-  }
-  const monthControl = event.target.closest("[data-month-change]");
-  if (monthControl) {
-    const change = Number(monthControl.dataset.monthChange);
-    state.month = change === 0
-      ? new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      : new Date(state.month.getFullYear(), state.month.getMonth() + change, 1);
-    render();
-    return;
-  }
-  const remove = event.target.closest("[data-delete-plan]");
-  if (remove) deletePlan(remove.dataset.deletePlan);
-});
-
-loadPlans().catch((error) => {
-  content.innerHTML = `<section class="empty-state"><div><div class="empty-icon">☁️</div><h2>暂时无法读取计划</h2><p>${escapeHtml(error.message)}</p><button class="primary-button" data-reload type="button">重新加载</button></div></section>`;
-  setStatus("云端计划加载失败。", true);
-});
-
-document.addEventListener("click", (event) => {
-  if (event.target.closest("[data-reload]")) loadPlans().catch((error) => setStatus(error.message, true));
-});
+const PERSON_COLORS = ["rose", "blue", "gold", "violet", "green"];
+const state = { view: "overview", month: new Date(new Date().getFullYear(), new Date().getMonth(), 1), people: [], plans: [] };
+const content = document.querySelector("#app-content"), tabs = document.querySelector("#person-tabs"), status = document.querySelector("#sync-status");
+const planDialog = document.querySelector("#plan-dialog"), peopleDialog = document.querySelector("#people-dialog"), planForm = document.querySelector("#plan-form"), personForm = document.querySelector("#person-form");
+const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (c) => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "'":"&#39;", '"':"&quot;" })[c]);
+const monthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2,"0")}`;
+const monthLabel = (date) => `${date.getFullYear()} 年 ${date.getMonth()+1} 月`;
+const personById = (id) => state.people.find((person) => person.id === id);
+const personName = (id) => personById(id)?.name || "未命名人物";
+function personColor(id) { return PERSON_COLORS[Math.max(state.people.findIndex((person) => person.id === id), 0) % PERSON_COLORS.length]; }
+function setStatus(message = "", error = false) { status.textContent = message; status.classList.toggle("error", error); }
+async function api(path = "", options = {}) { const response = await fetch(`${API_ROOT}${path}`, { credentials:"same-origin", headers:{"Content-Type":"application/json", ...(options.headers || {})}, ...options }); if (response.status === 401) window.location.assign("/login?next=/projects/study-plan"); if (response.status === 403) window.location.assign("/"); return response; }
+async function errorMessage(response, fallback) { return (await response.json().catch(() => ({}))).message || fallback; }
+async function load() { const [peopleResponse, plansResponse] = await Promise.all([api("/people"), api()]); if (!peopleResponse.ok) throw new Error(await errorMessage(peopleResponse,"无法读取人物。")); if (!plansResponse.ok) throw new Error(await errorMessage(plansResponse,"无法读取计划。")); state.people = (await peopleResponse.json()).people || []; state.plans = (await plansResponse.json()).plans || []; render(); }
+function events(personId = "") { return sortEvents(state.plans.flatMap(expandPlan)).filter((event) => event.date.startsWith(monthKey(state.month)) && (!personId || event.personId === personId)); }
+function duration(event) { const [sh,sm]=event.startTime.split(":").map(Number), [eh,em]=event.endTime.split(":").map(Number); return eh*60+em-sh*60-sm; }
+function renderTabs() { tabs.innerHTML = state.people.map((person) => `<button class="tab ${state.view===person.id?"active":""}" data-view="${person.id}" type="button">${escapeHtml(person.name)}</button>`).join(""); document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active",tab.dataset.view===state.view)); }
+function calendar(eventList, personId = "") { const start = new Date(state.month.getFullYear(),state.month.getMonth(),1); const offset=(start.getDay()+6)%7, grid=new Date(start); grid.setDate(1-offset); const map=new Map(); eventList.forEach((event)=>map.set(event.date,[...(map.get(event.date)||[]),event])); const today=toIsoDate(new Date()); let days=""; for(let i=0;i<42;i+=1){const date=new Date(grid);date.setDate(grid.getDate()+i);const iso=toIsoDate(date), inMonth=date.getMonth()===state.month.getMonth();const notes=state.plans.filter((plan)=>(!personId||plan.personId===personId)&&isRestDate(plan,iso)).map((plan)=>`<div class="rest-note">${personId?"休息日":escapeHtml(personName(plan.personId))+" · 休息日"}</div>`).join("");days+=`<div class="day ${inMonth?"":"muted"} ${iso===today?"today":""}"><span class="day-number">${date.getDate()}</span>${(map.get(iso)||[]).map((event)=>`<span class="event-chip ${personColor(event.personId)}" title="${escapeHtml(personName(event.personId)+" · "+event.subject+" · "+event.location)}">${event.startTime} ${escapeHtml(event.subject)}</span>`).join("")}${notes}</div>`;} return `<div class="month-controls"><h2 class="month-title">${monthLabel(state.month)}</h2><div class="month-actions"><button class="month-button" data-month="-1">‹</button><button class="month-button" data-month="0">·</button><button class="month-button" data-month="1">›</button></div></div><div class="weekdays"><span class="weekday">一</span><span class="weekday">二</span><span class="weekday">三</span><span class="weekday">四</span><span class="weekday">五</span><span class="weekday">六</span><span class="weekday">日</span></div><div class="calendar-grid">${days}</div>`; }
+function render() { renderTabs(); if (!state.people.length) { content.innerHTML=`<section class="empty-state"><div><div class="empty-icon">👤</div><h2>先新增人物</h2><p>人物由你自己创建，之后才能为他们安排学习计划。</p><button class="primary-button" data-open-people>人物管理</button></div></section>`; return; } const personId=state.people.some((person)=>person.id===state.view)?state.view:""; const list=events(personId), minutes=list.reduce((sum,event)=>sum+duration(event),0); const planList=state.plans.filter((plan)=>!personId||plan.personId===personId).map((plan)=>`<article class="plan-card ${personColor(plan.personId)}"><button class="delete-plan" data-delete="${plan.id}">×</button><h3><span class="student-tag ${personColor(plan.personId)}">${escapeHtml(personName(plan.personId))}</span> ${escapeHtml(plan.subject)}</h3><p>${plan.startDate} 起 · 学 ${plan.studyDays} 天／休 ${plan.restDays} 天 · 共 ${plan.targetStudyDays} 个学习日</p><div class="tag-row"><span class="tag">${plan.startTime}–${plan.endTime}</span><span class="tag">${escapeHtml(plan.location)}</span></div></article>`).join(""); const title=personId?`${escapeHtml(personName(personId))}的学习计划`:"本月学习总览"; content.innerHTML=state.view==="calendar"?`<section class="panel">${calendar(events())}</section>`:`<section class="summary-grid"><article class="metric-card gold"><div class="metric-label">本月课程时长</div><div class="metric-value">${(minutes/60).toFixed(1)} 小时</div><div class="metric-note">${list.length} 节课程</div></article><article class="metric-card blue"><div class="metric-label">人物数量</div><div class="metric-value">${state.people.length} 位</div><div class="metric-note">按人物分别安排</div></article></section><section class="content-grid"><section class="panel"><div class="panel-header"><h2 class="panel-title">${title}</h2><span class="panel-hint">${state.plans.length} 条计划</span></div><div class="plan-list">${planList||'<p class="panel-hint">当前没有计划。</p>'}</div></section><section class="panel">${calendar(list,personId)}</section></section>`; }
+function openPlan() { if (!state.people.length) return openPeople(); const select=document.querySelector("#person"); select.innerHTML=state.people.map((person)=>`<option value="${person.id}">${escapeHtml(person.name)}</option>`).join(""); planForm.reset(); document.querySelector("#start-date").value=toIsoDate(new Date()); document.querySelector("#form-error").textContent=""; planDialog.showModal(); }
+function openPeople() { renderPeople(); peopleDialog.showModal(); }
+function renderPeople() { document.querySelector("#people-list").innerHTML=state.people.length?state.people.map((person)=>`<article class="plan-card ${personColor(person.id)}"><h3>${escapeHtml(person.name)}</h3><div class="tag-row"><button class="secondary-button" data-rename="${person.id}">改名</button><button class="secondary-button" data-delete-person="${person.id}">删除</button></div></article>`).join(""):'<p class="panel-hint">尚未新增人物。</p>'; }
+async function refresh(message="同步完成") { await load(); setStatus(message); }
+planForm.addEventListener("submit",async(event)=>{event.preventDefault();const data=new FormData(planForm),plan={personId:data.get("personId"),subject:String(data.get("subject")||"").trim(),location:String(data.get("location")||"").trim(),startDate:data.get("startDate"),startTime:data.get("startTime"),endTime:data.get("endTime"),studyDays:Number(data.get("studyDays")),restDays:Number(data.get("restDays")),targetStudyDays:Number(data.get("targetStudyDays"))};const msg=validatePlanInput(plan);if(msg)return document.querySelector("#form-error").textContent=msg;const response=await api("",{method:"POST",body:JSON.stringify(plan)});if(!response.ok)return document.querySelector("#form-error").textContent=await errorMessage(response,"保存失败。");planDialog.close();await refresh();});
+personForm.addEventListener("submit",async(event)=>{event.preventDefault();const name=document.querySelector("#person-name").value.trim(),response=await api("/people",{method:"POST",body:JSON.stringify({name})});if(!response.ok)return document.querySelector("#person-error").textContent=await errorMessage(response,"新增失败。");personForm.reset();document.querySelector("#person-error").textContent="";await refresh();renderPeople();});
+document.addEventListener("click",async(event)=>{const tab=event.target.closest("[data-view]");if(tab){state.view=tab.dataset.view;render();return;}if(event.target.closest("[data-open-people]"))return openPeople();if(event.target.closest("#open-people-dialog"))return openPeople();if(event.target.closest("#open-plan-dialog"))return openPlan();const month=event.target.closest("[data-month]");if(month){const n=Number(month.dataset.month);state.month=n?new Date(state.month.getFullYear(),state.month.getMonth()+n,1):new Date(new Date().getFullYear(),new Date().getMonth(),1);return render();}const del=event.target.closest("[data-delete]");if(del&&confirm("删除这条计划？")){const r=await api(`/${del.dataset.delete}`,{method:"DELETE"});if(r.ok)await refresh();else setStatus(await errorMessage(r,"删除失败。"),true);}const personDelete=event.target.closest("[data-delete-person]");if(personDelete&&confirm("删除此人物？")){const r=await api(`/people/${personDelete.dataset.deletePerson}`,{method:"DELETE"});if(r.ok){if(state.view===personDelete.dataset.deletePerson)state.view="overview";await refresh();renderPeople();}else document.querySelector("#person-error").textContent=await errorMessage(r,"删除失败。");}const rename=event.target.closest("[data-rename]");if(rename){const person=personById(rename.dataset.rename),name=prompt("人物名称",person?.name);if(name?.trim()){const r=await api(`/people/${rename.dataset.rename}`,{method:"PATCH",body:JSON.stringify({name:name.trim()})});if(r.ok){await refresh();renderPeople();}else document.querySelector("#person-error").textContent=await errorMessage(r,"改名失败。");}}});
+document.querySelector("#close-plan-dialog").onclick=()=>planDialog.close();document.querySelector("#cancel-plan").onclick=()=>planDialog.close();document.querySelector("#close-people-dialog").onclick=()=>peopleDialog.close();
+load().catch((error)=>{content.innerHTML=`<section class="empty-state"><div><h2>暂时无法读取数据</h2><p>${escapeHtml(error.message)}</p></div></section>`;setStatus(error.message,true);});
