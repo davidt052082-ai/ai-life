@@ -40,7 +40,9 @@
     </header>
     <main><div id="projectGrid" class="project-grid" aria-live="polite"></div></main>
   </div>
-  <script>
+  <script type="module">
+    import { generateProjectCover } from "/project-cover.js";
+
     const projectGrid = document.getElementById("projectGrid");
     const accountName = document.getElementById("accountName");
     const authLinks = document.getElementById("authLinks");
@@ -58,7 +60,7 @@
       if (!projects.length) { projectGrid.innerHTML = '<div class="empty">暂无可访问项目。</div>'; return; }
       projectGrid.innerHTML = projects.map((project) => `
         <a class="project-card" href="${escapeAttribute(project.route)}">
-          <img src="${escapeAttribute(project.coverImageUrl || "/assets/cyber-body-base.png")}" alt="" />
+          <img src="${escapeAttribute(project.coverImageUrl || generateProjectCover(project))}" alt="${escapeAttribute(`${project.name} 项目封面`)}" />
           <div class="card-body"><h2>${escapeHtml(project.name)}</h2><p>${escapeHtml(project.description)}</p><span>进入项目</span></div>
         </a>`).join("");
     }

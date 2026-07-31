@@ -194,6 +194,9 @@ export function createApp(options = {}) {
   app.get("/study-plan/schedule.js", (_req, res) => {
     res.sendFile(path.join(__dirname, "src", "study-plan", "schedule.js"));
   });
+  app.get("/project-cover.js", (_req, res) => {
+    res.sendFile(path.join(__dirname, "src", "project-cover.js"));
+  });
   app.get("/study-plan-client.js", (_req, res) => {
     res.sendFile(path.join(__dirname, "study-plan-client.js"));
   });
