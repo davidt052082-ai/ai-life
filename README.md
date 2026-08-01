@@ -50,9 +50,18 @@ AI Life 是一个带账号、项目授权和 PostgreSQL 存储的项目入口。
 4. “默认分组”不能删除，成员不能移出；它必须始终保留“智能穿戴监测系统”权限，保证新注册用户可以立即使用该项目。
 5. 非管理员无法访问后台页面或 `/api/admin/*` 接口；普通用户在项目首页仍只会看到已获授权项目。
 
+## 运营统计
+
+- 系统使用第一方统计，不会向 Google Analytics、Matomo 或其他第三方平台发送访问数据。
+- 浏览器只保存随机访客与标签页会话标识；服务端仅在用户已登录时关联账号。不会采集密码、Cookie、表单原文、完整 IP 或任意自定义业务载荷。
+- 原始事件保留 180 天；按日汇总的访问、注册、项目进入、活跃用户和关键动作指标长期保留。
+- 管理员登录后可打开 [http://localhost:5173/admin/analytics](http://localhost:5173/admin/analytics) 查看概览、流量、转化和最近事件。
+- `ANALYTICS_IP_SALT` 可选。设置后，系统用它对请求 IP 进行不可逆哈希，用于限流；留空则不保存 IP 哈希。请使用足够长的随机值并避免随意轮换。
+- `TRUST_PROXY` 默认是 `false`。只有在由你控制、会覆盖地理位置请求头的反向代理之后，才设为 `true`；否则不记录国家/地区。
+
 ## 切换云端 PostgreSQL
 
-部署环境只需设置云数据库提供的 `DATABASE_URL`、强随机 `SESSION_SECRET`、`ADMIN_EMAIL` 和 `NODE_ENV=production`，执行一次 `npm run db:migrate` 后启动同一服务即可。前端和应用代码不需要修改。
+部署环境只需设置云数据库提供的 `DATABASE_URL`、强随机 `SESSION_SECRET`、`ADMIN_EMAIL`、`NODE_ENV=production`，以及可选的 `ANALYTICS_IP_SALT` / `TRUST_PROXY`，执行一次 `npm run db:migrate` 后启动同一服务即可。前端和应用代码不需要修改。
 
 原有的纯静态 Cloudflare Pages 部署不能承载账号、会话和 PostgreSQL API；正式发布应使用支持 Node.js 服务和数据库连接的运行环境。
 

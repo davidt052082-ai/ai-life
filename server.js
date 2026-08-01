@@ -2,6 +2,7 @@ import "dotenv/config";
 import cookieParser from "cookie-parser";
 import express from "express";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createSessionService } from "./src/auth/session.js";
 import { createDatabasePool } from "./src/db/pool.js";
@@ -14,13 +15,19 @@ import { createAdminRepository } from "./src/repositories/adminRepository.js";
 import { createWearableRepository } from "./src/repositories/wearableRepository.js";
 import { createStudyPlanRepository } from "./src/repositories/studyPlanRepository.js";
 import { createStudyPeopleRepository } from "./src/repositories/studyPeopleRepository.js";
+import { createAnalyticsRepository } from "./src/repositories/analyticsRepository.js";
 import { createAuthRouter } from "./src/routes/authRoutes.js";
 import { createProjectRouter } from "./src/routes/projectRoutes.js";
 import { createAdminRouter } from "./src/routes/adminRoutes.js";
+import { createAnalyticsRouter } from "./src/routes/analyticsRoutes.js";
+import { createAdminAnalyticsRouter } from "./src/routes/adminAnalyticsRoutes.js";
 import { createWearableRouter } from "./src/routes/wearableRoutes.js";
 import { createStudyPlanRouter } from "./src/routes/studyPlanRoutes.js";
 import { createStudyPeopleRouter } from "./src/routes/studyPeopleRoutes.js";
 import { renderShareImagePng as defaultRenderShareImagePng } from "./src/shareImage.js";
+import { createSlidingWindowRateLimiter } from "./src/analytics/rateLimiter.js";
+import { startAnalyticsMaintenance } from "./src/analytics/maintenance.js";
+import { normalizeServerEvent } from "./src/analytics/normalizeEvent.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,35 +45,70 @@ export function createApp(options = {}) {
   const wearableRepository = options.wearableRepository || (pool ? createWearableRepository(pool) : null);
   const studyPlanRepository = options.studyPlanRepository || (pool ? createStudyPlanRepository(pool) : null);
   const studyPeopleRepository = options.studyPeopleRepository || (pool ? createStudyPeopleRepository(pool) : null);
+  const analyticsRepository = options.analyticsRepository || (pool ? createAnalyticsRepository(pool) : null);
   const sessionService = options.sessionService || (userRepository
     ? createSessionService(userRepository, options.sessionOptions)
     : null);
   const sessionSecret = options.sessionSecret || process.env.SESSION_SECRET || "development-session-secret";
+  const analyticsRateLimiter = options.analyticsRateLimiter || createSlidingWindowRateLimiter();
+  const analyticsIpSalt = options.analyticsIpSalt ?? process.env.ANALYTICS_IP_SALT ?? "";
+  const trustProxy = options.trustProxy ?? process.env.TRUST_PROXY === "true";
+  const analytics = analyticsRepository && {
+    record(event) {
+      return analyticsRepository.recordEvent(normalizeServerEvent({
+        id: randomUUID(),
+        visitorId: randomUUID(),
+        sessionId: randomUUID(),
+        ...event
+      }));
+    }
+  };
+
+  app.use(cookieParser(sessionSecret));
+
+  if (userRepository && sessionService && analyticsRepository) {
+    app.use("/api/analytics", express.json({ limit: "8kb" }), createAnalyticsRouter({
+      repository: analyticsRepository,
+      sessionService,
+      rateLimiter: analyticsRateLimiter,
+      ipSalt: analyticsIpSalt,
+      trustProxy
+    }));
+  } else {
+    app.use("/api/analytics", (_req, res) => {
+      res.status(503).json({ error: "DATABASE_NOT_CONFIGURED", message: "数据库尚未配置。" });
+    });
+  }
 
   app.use(express.json({ limit: "2mb" }));
-  app.use(cookieParser(sessionSecret));
 
   if (userRepository && sessionService) {
     app.use("/api/auth", createAuthRouter({
       repository: userRepository,
       sessionService,
       defaultGroupCode: "default",
-      adminEmail
+      adminEmail,
+      analytics
     }));
     app.use("/api/projects", createProjectRouter({ repository: userRepository, sessionService }));
-    app.use("/api/admin", createAdminRouter({ repository: adminRepository, sessionService, adminEmail }));
+    if (analyticsRepository) {
+      app.use("/api/admin/analytics", createAdminAnalyticsRouter({ repository: analyticsRepository, sessionService, adminEmail }));
+    }
+    app.use("/api/admin", createAdminRouter({ repository: adminRepository, sessionService, adminEmail, analytics }));
     app.use("/api/projects/:code/wearable", createWearableRouter({
       repository: wearableRepository,
       projectRepository: userRepository,
       sessionService,
-      wearableProjectCode: WEARABLE_PROJECT_CODE
+      wearableProjectCode: WEARABLE_PROJECT_CODE,
+      analytics
     }));
     app.use("/api/projects/:code/study-plans", createStudyPlanRouter({
       repository: studyPlanRepository,
       peopleRepository: studyPeopleRepository,
       projectRepository: userRepository,
       sessionService,
-      studyPlanProjectCode: STUDY_PLAN_PROJECT_CODE
+      studyPlanProjectCode: STUDY_PLAN_PROJECT_CODE,
+      analytics
     }));
     app.use("/api/projects/:code/study-plans/people", createStudyPeopleRouter({
       repository: studyPeopleRepository,
@@ -168,6 +210,9 @@ export function createApp(options = {}) {
   app.get("/admin", (_req, res) => {
     res.sendFile(path.join(__dirname, "admin.html"));
   });
+  app.get("/admin/analytics", (_req, res) => {
+    res.sendFile(path.join(__dirname, "analytics.html"));
+  });
   app.get("/", (_req, res) => {
     res.sendFile(path.join(__dirname, "project-home.html"));
   });
@@ -200,11 +245,20 @@ export function createApp(options = {}) {
   app.get("/study-plan-client.js", (_req, res) => {
     res.sendFile(path.join(__dirname, "study-plan-client.js"));
   });
+  app.get("/analytics-client.js", (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "analytics-client.js"));
+  });
 
   app.locals.syncConfiguredAdmin = async () => {
     if (adminRepository && String(adminEmail).trim()) {
       await adminRepository.syncConfiguredAdmin(adminEmail);
     }
+  };
+  let stopAnalyticsMaintenance = null;
+  app.locals.startAnalyticsMaintenance = () => {
+    if (!analyticsRepository) return () => {};
+    if (!stopAnalyticsMaintenance) stopAnalyticsMaintenance = startAnalyticsMaintenance(analyticsRepository);
+    return stopAnalyticsMaintenance;
   };
 
   return app;
@@ -218,7 +272,14 @@ if (process.argv[1] === __filename) {
   } catch (error) {
     console.error("Unable to synchronize configured administrator:", error);
   }
-  app.listen(port, () => {
+  const stopMaintenance = app.locals.startAnalyticsMaintenance();
+  const server = app.listen(port, () => {
     console.log(`AI Life wearable collector running at http://localhost:${port}`);
   });
+  const stop = () => server.close(() => {
+    stopMaintenance();
+    process.exit(0);
+  });
+  process.once("SIGINT", stop);
+  process.once("SIGTERM", stop);
 }

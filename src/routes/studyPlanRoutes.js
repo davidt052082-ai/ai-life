@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { requireProjectAccess, requireUser } from "../auth/middleware.js";
 import { validatePlanInput } from "../study-plan/schedule.js";
+import { recordAnalytics } from "../analytics/record.js";
 
 function inputError(message) {
   const error = new Error(message);
@@ -52,7 +53,7 @@ function route(handler) {
   };
 }
 
-export function createStudyPlanRouter({ repository, peopleRepository, projectRepository = repository, sessionService, studyPlanProjectCode }) {
+export function createStudyPlanRouter({ repository, peopleRepository, projectRepository = repository, sessionService, studyPlanProjectCode, analytics }) {
   const router = Router({ mergeParams: true });
   router.use(requireUser(sessionService));
   router.use(requireProjectAccess(projectRepository));
@@ -80,6 +81,12 @@ export function createStudyPlanRouter({ repository, peopleRepository, projectRep
       plan
     });
     res.status(201).json({ plan: created });
+    recordAnalytics(analytics, {
+      eventType: "study_plan_create",
+      userId: req.user.id,
+      projectCode: req.project.code,
+      pagePath: "/projects/study-plan"
+    });
   }));
 
   router.delete("/:id", route(async (req, res) => {

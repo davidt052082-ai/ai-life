@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { hashPassword, verifyPassword } from "../auth/password.js";
+import { recordAnalytics } from "../analytics/record.js";
 
 function normalizeEmail(value) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -10,7 +11,7 @@ function publicUser(user) {
   return { id: user.id, email: user.email, displayName: user.displayName, isAdmin: Boolean(user.isAdmin) };
 }
 
-export function createAuthRouter({ repository, sessionService, defaultGroupCode, adminEmail = "" }) {
+export function createAuthRouter({ repository, sessionService, defaultGroupCode, adminEmail = "", analytics }) {
   const router = Router();
 
   router.post("/register", async (req, res) => {
@@ -33,6 +34,7 @@ export function createAuthRouter({ repository, sessionService, defaultGroupCode,
       });
       await sessionService.signIn(res, user.id);
       res.status(201).json({ user: publicUser(user) });
+      recordAnalytics(analytics, { eventType: "sign_up", userId: user.id, pagePath: "/register" });
     } catch (error) {
       if (error.code === "23505") {
         res.status(409).json({ error: "EMAIL_ALREADY_REGISTERED", message: "该邮箱已经注册。" });
@@ -58,6 +60,7 @@ export function createAuthRouter({ repository, sessionService, defaultGroupCode,
 
     await sessionService.signIn(res, user.id);
     res.json({ user: publicUser(user) });
+    recordAnalytics(analytics, { eventType: "login", userId: user.id, pagePath: "/login" });
   });
 
   router.post("/logout", async (req, res) => {

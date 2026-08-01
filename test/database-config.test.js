@@ -10,11 +10,18 @@ test("validateDatabaseUrl only accepts PostgreSQL connection strings", async () 
   assert.throws(() => validateDatabaseUrl("mysql://localhost/ai_life"), /DATABASE_URL/);
 });
 
-test("environment example includes database and administrator configuration", async () => {
-  const envExample = await fs.readFile(new URL("../.env.example", import.meta.url), "utf8");
+test("environment example includes database, administrator, and analytics configuration", async () => {
+  const [envExample, readme] = await Promise.all([
+    fs.readFile(new URL("../.env.example", import.meta.url), "utf8"),
+    fs.readFile(new URL("../README.md", import.meta.url), "utf8")
+  ]);
 
   assert.match(envExample, /^DATABASE_URL=/m);
   assert.match(envExample, /^ADMIN_EMAIL=/m);
+  assert.match(envExample, /^ANALYTICS_IP_SALT=/m);
+  assert.match(envExample, /^TRUST_PROXY=false$/m);
+  assert.match(readme, /180 天/);
+  assert.match(readme, /\/admin\/analytics/);
 });
 
 test("listMigrationFiles returns SQL files in lexical order", async () => {
@@ -28,6 +35,7 @@ test("listMigrationFiles returns SQL files in lexical order", async () => {
     "004_study_plan_project.sql",
     "005_admin_group.sql",
     "006_custom_study_people.sql",
-    "007_project_cover_generation.sql"
+    "007_project_cover_generation.sql",
+    "008_operations_analytics.sql"
   ]);
 });

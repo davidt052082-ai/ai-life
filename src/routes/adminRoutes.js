@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { requireAdmin, requireUser } from "../auth/middleware.js";
+import { recordAnalytics } from "../analytics/record.js";
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -51,7 +52,7 @@ function requireUuid(value) {
   return value;
 }
 
-export function createAdminRouter({ repository, sessionService, adminEmail }) {
+export function createAdminRouter({ repository, sessionService, adminEmail, analytics }) {
   const router = Router();
   router.use(requireUser(sessionService));
   router.use(requireAdmin({ adminEmail }));
@@ -74,6 +75,7 @@ export function createAdminRouter({ repository, sessionService, adminEmail }) {
       description
     });
     res.status(201).json({ group });
+    recordAnalytics(analytics, { eventType: "admin_group_create", userId: req.user.id, pagePath: "/admin" });
   }));
 
   router.patch("/groups/:groupId", route(async (req, res) => {
@@ -90,21 +92,25 @@ export function createAdminRouter({ repository, sessionService, adminEmail }) {
   router.put("/groups/:groupId/members/:userId", route(async (req, res) => {
     await repository.addMember({ groupId: requireUuid(req.params.groupId), userId: requireUuid(req.params.userId) });
     res.status(204).end();
+    recordAnalytics(analytics, { eventType: "admin_membership_change", userId: req.user.id, pagePath: "/admin", properties: { operation: "grant" } });
   }));
 
   router.delete("/groups/:groupId/members/:userId", route(async (req, res) => {
     await repository.removeMember({ groupId: requireUuid(req.params.groupId), userId: requireUuid(req.params.userId) });
     res.status(204).end();
+    recordAnalytics(analytics, { eventType: "admin_membership_change", userId: req.user.id, pagePath: "/admin", properties: { operation: "revoke" } });
   }));
 
   router.put("/groups/:groupId/projects/:projectId", route(async (req, res) => {
     await repository.grantProject({ groupId: requireUuid(req.params.groupId), projectId: requireUuid(req.params.projectId) });
     res.status(204).end();
+    recordAnalytics(analytics, { eventType: "admin_project_access_change", userId: req.user.id, pagePath: "/admin", properties: { operation: "grant" } });
   }));
 
   router.delete("/groups/:groupId/projects/:projectId", route(async (req, res) => {
     await repository.revokeProject({ groupId: requireUuid(req.params.groupId), projectId: requireUuid(req.params.projectId) });
     res.status(204).end();
+    recordAnalytics(analytics, { eventType: "admin_project_access_change", userId: req.user.id, pagePath: "/admin", properties: { operation: "revoke" } });
   }));
 
   return router;

@@ -11,6 +11,14 @@ try {
   console.error("Unable to synchronize configured administrator:", error);
 }
 
-app.listen(port, host, () => {
+const stopMaintenance = app.locals.startAnalyticsMaintenance();
+const server = app.listen(port, host, () => {
   console.log(`AI Life running at http://${host}:${port}`);
 });
+
+const stop = () => server.close(() => {
+  stopMaintenance();
+  process.exit(0);
+});
+process.once("SIGINT", stop);
+process.once("SIGTERM", stop);

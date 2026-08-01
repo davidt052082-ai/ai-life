@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { requireProjectAccess, requireUser } from "../auth/middleware.js";
 import { VersionConflictError, WearableNotFoundError } from "../repositories/wearableRepository.js";
+import { recordAnalytics } from "../analytics/record.js";
 
 function expectObject(value, name) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -60,7 +61,7 @@ function route(handler) {
   };
 }
 
-export function createWearableRouter({ repository, projectRepository = repository, sessionService, wearableProjectCode }) {
+export function createWearableRouter({ repository, projectRepository = repository, sessionService, wearableProjectCode, analytics }) {
   const router = Router({ mergeParams: true });
   router.use(requireUser(sessionService));
   router.use(requireProjectAccess(projectRepository));
@@ -102,6 +103,13 @@ export function createWearableRouter({ repository, projectRepository = repositor
       data: expectObject(body.data, "data")
     });
     res.status(201).json({ equipment });
+    recordAnalytics(analytics, {
+      eventType: "wearable_equipment_add",
+      userId: req.user.id,
+      projectCode: req.project.code,
+      pagePath: "/projects/wearable",
+      properties: { sourceType: "custom" }
+    });
   }));
 
   router.patch("/equipment/:id", route(async (req, res) => {
@@ -161,6 +169,12 @@ export function createWearableRouter({ repository, projectRepository = repositor
       snapshot: expectObject(body.snapshot, "snapshot")
     });
     res.status(201).json({ scheme });
+    recordAnalytics(analytics, {
+      eventType: "wearable_scheme_save",
+      userId: req.user.id,
+      projectCode: req.project.code,
+      pagePath: "/projects/wearable"
+    });
   }));
 
   router.delete("/schemes/:id", route(async (req, res) => {

@@ -2263,6 +2263,7 @@
       }
     }
   </style>
+  <script src="/analytics-client.js" defer></script>
 </head>
 <body class="desktop-poster-mode">
   <main class="page">
@@ -2667,6 +2668,7 @@
   </main>
   <script>
     const STORAGE_KEY = "ai-life-anchor-config-v2";
+    let projectEnterTracked = false;
     const EQUIPMENT_STORAGE_KEY = "ai-life-custom-equipment-v1";
     const DELETED_EQUIPMENT_STORAGE_KEY = "ai-life-deleted-equipment-v1";
     const EQUIPMENT_OVERRIDES_STORAGE_KEY = "ai-life-equipment-overrides-v1";
@@ -3132,6 +3134,10 @@
       serverStateLoaded = true;
       renderActiveProject();
       if (workspaceVersion === 0) scheduleWorkspaceSave();
+      if (!projectEnterTracked) {
+        projectEnterTracked = true;
+        window.aiLifeAnalytics?.track("project_enter", { projectCode: "wearable-monitoring" });
+      }
     }
 
     async function initializeWearableProject() {
