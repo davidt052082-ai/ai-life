@@ -103,3 +103,19 @@ test("event list preserves a partial final page and only emits a cursor when ano
   assert.equal(result.events.length, 1);
   assert.equal(result.nextCursor, null);
 });
+
+test("funnel separates registered and unregistered visitors without double-counting a browser", async () => {
+  const pool = createPool([{ page_views: "10", registered_visitors: "4", unregistered_visitors: "6", signups: "2", project_enters: "3", key_actions: "2" }]);
+  const repository = createAnalyticsRepository(pool);
+
+  const stages = await repository.getFunnel({ from: "2026-07-01", to: "2026-07-07" });
+
+  assert.deepEqual(stages[0], {
+    key: "pageViews",
+    label: "访问",
+    count: 10,
+    registeredVisitors: 4,
+    unregisteredVisitors: 6
+  });
+  assert.match(pool.calls[0].text, /bool_or\(user_id IS NOT NULL\)/);
+});

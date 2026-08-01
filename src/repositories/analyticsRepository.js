@@ -174,17 +174,35 @@ export function createAnalyticsRepository(pool) {
 
     async getFunnel({ from, to }) {
       const result = await pool.query(
-        `SELECT
-           COUNT(DISTINCT visitor_id) FILTER (WHERE event_type = 'page_view') AS page_views,
-           COUNT(DISTINCT COALESCE(user_id::text, visitor_id::text)) FILTER (WHERE event_type = 'sign_up') AS signups,
-           COUNT(DISTINCT COALESCE(user_id::text, visitor_id::text)) FILTER (WHERE event_type = 'project_enter') AS project_enters,
-           COUNT(DISTINCT COALESCE(user_id::text, visitor_id::text)) FILTER (WHERE event_type IN ('wearable_equipment_add', 'wearable_scheme_save', 'study_plan_create')) AS key_actions
-         FROM analytics_events WHERE event_date BETWEEN $1::date AND $2::date`,
+        `WITH page_visitors AS (
+           SELECT visitor_id, bool_or(user_id IS NOT NULL) AS registered
+           FROM analytics_events
+           WHERE event_date BETWEEN $1::date AND $2::date AND event_type = 'page_view'
+           GROUP BY visitor_id
+         ), event_counts AS (
+           SELECT
+             COUNT(DISTINCT COALESCE(user_id::text, visitor_id::text)) FILTER (WHERE event_type = 'sign_up') AS signups,
+             COUNT(DISTINCT COALESCE(user_id::text, visitor_id::text)) FILTER (WHERE event_type = 'project_enter') AS project_enters,
+             COUNT(DISTINCT COALESCE(user_id::text, visitor_id::text)) FILTER (WHERE event_type IN ('wearable_equipment_add', 'wearable_scheme_save', 'study_plan_create')) AS key_actions
+           FROM analytics_events WHERE event_date BETWEEN $1::date AND $2::date
+         )
+         SELECT
+           (SELECT COUNT(*) FROM page_visitors) AS page_views,
+           (SELECT COUNT(*) FROM page_visitors WHERE registered) AS registered_visitors,
+           (SELECT COUNT(*) FROM page_visitors WHERE NOT registered) AS unregistered_visitors,
+           signups, project_enters, key_actions
+         FROM event_counts`,
         [from, to]
       );
       const row = result.rows[0] || {};
       return [
-        { key: "pageViews", label: "访问", count: number(row.page_views) },
+        {
+          key: "pageViews",
+          label: "访问",
+          count: number(row.page_views),
+          registeredVisitors: number(row.registered_visitors),
+          unregisteredVisitors: number(row.unregistered_visitors)
+        },
         { key: "signups", label: "注册", count: number(row.signups) },
         { key: "projectEnters", label: "进入项目", count: number(row.project_enters) },
         { key: "keyActions", label: "关键动作", count: number(row.key_actions) }

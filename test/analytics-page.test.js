@@ -44,6 +44,8 @@ test("operations console exposes four data views and uses only first-party APIs"
   assert.match(analytics, /\/api\/admin\/analytics\/breakdown/);
   assert.match(analytics, /\/api\/admin\/analytics\/funnel/);
   assert.match(analytics, /\/api\/admin\/analytics\/events/);
+  assert.match(analytics, /已注册访问/);
+  assert.match(analytics, /未注册访问/);
   assert.match(admin, /href="\/admin\/analytics"/);
   assert.match(server, /app\.get\("\/admin\/analytics"/);
   assert.doesNotMatch(analytics, /google-analytics|googletagmanager|matomo|cdn\.jsdelivr/i);
