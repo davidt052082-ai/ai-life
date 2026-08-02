@@ -11,12 +11,16 @@ function sendError(res, error) {
   res.status(500).json({ error: "ANALYTICS_EVENT_FAILED", message: "统计事件暂时无法记录。" });
 }
 
-export function createAnalyticsRouter({ repository, sessionService, rateLimiter, ipSalt = "", trustProxy = false }) {
+export function createAnalyticsRouter({ repository, sessionService, rateLimiter, excludedTraffic, ipSalt = "", trustProxy = false }) {
   const router = Router();
 
   router.post("/events", async (req, res) => {
     try {
       const event = normalizeClientEvent(req.body);
+      if (excludedTraffic?.has(req.ip)) {
+        res.status(204).end();
+        return;
+      }
       const requestContext = requestAnalyticsContext(req, { ipSalt, trustProxy });
       const rateLimitKey = `${requestContext.ipHash || "no-ip"}:${event.visitorId}`;
       if (!rateLimiter.allow(rateLimitKey)) {

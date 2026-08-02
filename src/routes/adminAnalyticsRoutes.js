@@ -2,7 +2,7 @@ import { Router } from "express";
 import { requireAdmin, requireUser } from "../auth/middleware.js";
 import { ANALYTICS_EVENT_TYPES } from "../analytics/normalizeEvent.js";
 
-const DIMENSIONS = new Set(["source", "device", "page", "project", "country"]);
+const DIMENSIONS = new Set(["source", "device", "page", "project", "country", "city"]);
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const projectCodePattern = /^[a-z0-9][a-z0-9-]{0,79}$/;
 

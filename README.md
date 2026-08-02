@@ -57,11 +57,12 @@ AI Life 是一个带账号、项目授权和 PostgreSQL 存储的项目入口。
 - 原始事件保留 180 天；按日汇总的访问、注册、项目进入、活跃用户和关键动作指标长期保留。
 - 管理员登录后可打开 [http://localhost:5173/admin/analytics](http://localhost:5173/admin/analytics) 查看概览、流量、转化和最近事件。
 - `ANALYTICS_IP_SALT` 可选。设置后，系统用它对请求 IP 进行不可逆哈希，用于限流；留空则不保存 IP 哈希。请使用足够长的随机值并避免随意轮换。
-- `TRUST_PROXY` 默认是 `false`。只有在由你控制、会覆盖地理位置请求头的反向代理之后，才设为 `true`；否则不记录国家/地区。
+- `TRUST_PROXY` 默认是 `false`。只有在由你控制、会覆盖地理位置请求头的反向代理之后，才设为 `true`；此时统计会读取代理提供的国家和城市头（如 `CF-IPCountry`、`CF-IPCity` 或 `X-Geo-City`），其他情况显示“未知城市”。
+- 本机回环、私有 IPv4 网段和 IPv6 本地唯一本地地址会自动排除。`ANALYTICS_EXCLUDED_IPS` 可额外配置部署、办公网络的 IPv4 地址或 CIDR（以逗号分隔），这类访问会在写库前直接忽略。
 
 ## 切换云端 PostgreSQL
 
-部署环境只需设置云数据库提供的 `DATABASE_URL`、强随机 `SESSION_SECRET`、`ADMIN_EMAIL`、`NODE_ENV=production`，以及可选的 `ANALYTICS_IP_SALT` / `TRUST_PROXY`，执行一次 `npm run db:migrate` 后启动同一服务即可。前端和应用代码不需要修改。
+部署环境只需设置云数据库提供的 `DATABASE_URL`、强随机 `SESSION_SECRET`、`ADMIN_EMAIL`、`NODE_ENV=production`，以及可选的 `ANALYTICS_IP_SALT` / `TRUST_PROXY` / `ANALYTICS_EXCLUDED_IPS`，执行一次 `npm run db:migrate` 后启动同一服务即可。前端和应用代码不需要修改。
 
 原有的纯静态 Cloudflare Pages 部署不能承载账号、会话和 PostgreSQL API；正式发布应使用支持 Node.js 服务和数据库连接的运行环境。
 

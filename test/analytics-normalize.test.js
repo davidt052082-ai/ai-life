@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeClientEvent, requestAnalyticsContext } from "../src/analytics/normalizeEvent.js";
 import { createSlidingWindowRateLimiter } from "../src/analytics/rateLimiter.js";
+import { createAnalyticsExclusionList } from "../src/analytics/excludedTraffic.js";
 
 const visitorId = "c2b8404a-8728-468d-8c6b-f4145ce1713a";
 const sessionId = "ecb1df03-3a68-43b5-94ce-1b66f7c44438";
@@ -50,6 +51,30 @@ test("does not trust country headers unless proxy trust is explicitly enabled", 
 test("does not create an IP hash without an explicit deployment salt", () => {
   const context = requestAnalyticsContext({ ip: "203.0.113.8", headers: {} }, { ipSalt: "", trustProxy: false });
   assert.equal(context.ipHash, null);
+});
+
+test("trusted proxy context accepts a bounded city header and ignores it otherwise", () => {
+  const req = { ip: "198.51.100.7", headers: { "cf-ipcity": " 上海 ", "x-geo-city": "杭州" } };
+
+  assert.equal(requestAnalyticsContext(req, { trustProxy: false }).cityName, null);
+  assert.equal(requestAnalyticsContext(req, { trustProxy: true }).cityName, "上海");
+});
+
+test("analytics exclusions cover local/private addresses and configured IPv4 CIDRs", () => {
+  const exclusions = createAnalyticsExclusionList("203.0.113.12,198.51.100.0/24,2001:db8::1");
+
+  assert.equal(exclusions.has("127.0.0.1"), true);
+  assert.equal(exclusions.has("10.20.30.40"), true);
+  assert.equal(exclusions.has("::1"), true);
+  assert.equal(exclusions.has("fc00::5"), true);
+  assert.equal(exclusions.has("198.51.100.90"), true);
+  assert.equal(exclusions.has("203.0.113.12"), true);
+  assert.equal(exclusions.has("203.0.113.13"), false);
+});
+
+test("invalid configured analytics exclusion entries fail startup configuration clearly", () => {
+  assert.throws(() => createAnalyticsExclusionList("not-an-ip"), /ANALYTICS_EXCLUDED_IPS/);
+  assert.throws(() => createAnalyticsExclusionList("203.0.113.0/33"), /ANALYTICS_EXCLUDED_IPS/);
 });
 
 test("limits one browser/IP key to sixty events per minute", () => {

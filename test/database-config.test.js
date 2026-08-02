@@ -20,8 +20,10 @@ test("environment example includes database, administrator, and analytics config
   assert.match(envExample, /^ADMIN_EMAIL=/m);
   assert.match(envExample, /^ANALYTICS_IP_SALT=/m);
   assert.match(envExample, /^TRUST_PROXY=false$/m);
+  assert.match(envExample, /^ANALYTICS_EXCLUDED_IPS=$/m);
   assert.match(readme, /180 天/);
   assert.match(readme, /\/admin\/analytics/);
+  assert.match(readme, /CF-IPCity/);
 });
 
 test("listMigrationFiles returns SQL files in lexical order", async () => {
@@ -36,6 +38,7 @@ test("listMigrationFiles returns SQL files in lexical order", async () => {
     "005_admin_group.sql",
     "006_custom_study_people.sql",
     "007_project_cover_generation.sql",
-    "008_operations_analytics.sql"
+    "008_operations_analytics.sql",
+    "009_analytics_city_and_exclusion.sql"
   ]);
 });

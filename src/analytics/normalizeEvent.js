@@ -175,5 +175,9 @@ export function requestAnalyticsContext(req, { ipSalt = "", trustProxy = false }
   const countryCode = typeof countryHeader === "string" && /^[a-z]{2}$/i.test(countryHeader.trim())
     ? countryHeader.trim().toUpperCase()
     : null;
-  return { ipHash, countryCode };
+  const cityHeader = trustProxy ? (req?.headers?.["cf-ipcity"] || req?.headers?.["x-geo-city"]) : null;
+  const cityName = typeof cityHeader === "string" && cityHeader.trim()
+    ? cityHeader.trim().slice(0, 80)
+    : null;
+  return { ipHash, countryCode, cityName };
 }

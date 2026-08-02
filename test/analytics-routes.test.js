@@ -94,6 +94,24 @@ test("public ingestion rejects invalid input and silently suppresses rate-limite
   assert.equal(recorded.length, 0);
 });
 
+test("excluded internal traffic is acknowledged without rate limiting or persistence", async () => {
+  const { createAnalyticsRouter } = await import("../src/routes/analyticsRoutes.js");
+  let limiterCalls = 0;
+  const recorded = [];
+  const router = createAnalyticsRouter({
+    repository: { recordEvent: async (event) => recorded.push(event) },
+    sessionService: { getCurrentUser: async () => null },
+    rateLimiter: { allow: () => { limiterCalls += 1; return true; } },
+    excludedTraffic: { has: (ip) => ip === "127.0.0.1" }
+  });
+  const handler = router.stack.find((layer) => layer.route?.path === "/events").route.stack.at(-1).handle;
+  const result = await invoke(handler, { body: eventBody(), ip: "127.0.0.1", headers: {} });
+
+  assert.equal(result.statusCode, 204);
+  assert.equal(recorded.length, 0);
+  assert.equal(limiterCalls, 0);
+});
+
 test("admin analytics router exposes the protected query endpoints", async () => {
   const { createAdminAnalyticsRouter } = await import("../src/routes/adminAnalyticsRoutes.js");
   const router = createAdminAnalyticsRouter({ repository: {}, sessionService: {}, adminEmail: "owner@example.com" });
@@ -119,6 +137,21 @@ test("admin analytics query validation rejects unknown dimensions and oversized 
   assert.equal(unknownDimension.body.error, "INVALID_ANALYTICS_QUERY");
   assert.equal(oversizedRange.statusCode, 400);
   assert.equal(oversizedRange.body.error, "INVALID_ANALYTICS_QUERY");
+});
+
+test("admin analytics accepts the city breakdown dimension", async () => {
+  const { createAdminAnalyticsRouter } = await import("../src/routes/adminAnalyticsRoutes.js");
+  let received;
+  const router = createAdminAnalyticsRouter({
+    repository: { getBreakdown: async (options) => { received = options; return []; } },
+    sessionService: {},
+    adminEmail: "owner@example.com"
+  });
+  const handler = router.stack.find((layer) => layer.route?.path === "/breakdown").route.stack.at(-1).handle;
+  const result = await invoke(handler, { query: { dimension: "city" } });
+
+  assert.equal(result.statusCode, 200);
+  assert.equal(received.dimension, "city");
 });
 
 test("database-disabled apps retain an explicit analytics unavailable response", async () => {

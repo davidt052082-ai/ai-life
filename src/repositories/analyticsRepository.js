@@ -40,6 +40,7 @@ function eventFromRow(row) {
     referrerHost: row.referrer_host,
     deviceType: row.device_type,
     countryCode: row.country_code,
+    cityName: row.city_name,
     userId: row.user_id,
     properties: row.properties || {}
   };
@@ -50,7 +51,8 @@ const breakdownFields = {
   device: "COALESCE(NULLIF(device_type, ''), 'unknown')",
   page: "COALESCE(NULLIF(page_path, ''), '/')",
   project: "COALESCE(NULLIF(project_code, ''), 'unknown')",
-  country: "COALESCE(NULLIF(country_code, ''), 'unknown')"
+  country: "COALESCE(NULLIF(country_code, ''), 'unknown')",
+  city: "COALESCE(NULLIF(city_name, ''), '未知城市')"
 };
 
 export function createAnalyticsRepository(pool) {
@@ -61,17 +63,17 @@ export function createAnalyticsRepository(pool) {
            id, visitor_id, session_id, user_id, event_type, page_path, project_code,
            referrer_host, utm_source, utm_medium, utm_campaign, utm_term, utm_content,
            device_type, browser_name, os_name, language, screen_width, screen_height,
-           ip_hash, country_code, properties
+           ip_hash, country_code, city_name, properties
          ) VALUES (
            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-           $14, $15, $16, $17, $18, $19, $20, $21, $22::jsonb
+           $14, $15, $16, $17, $18, $19, $20, $21, $22, $23::jsonb
          )`,
         [
           event.id, event.visitorId, event.sessionId, event.userId, event.eventType,
           event.pagePath, event.projectCode, event.referrerHost, event.utmSource,
           event.utmMedium, event.utmCampaign, event.utmTerm, event.utmContent,
           event.deviceType, event.browserName, event.osName, event.language,
-          event.screenWidth, event.screenHeight, event.ipHash, event.countryCode,
+          event.screenWidth, event.screenHeight, event.ipHash, event.countryCode, event.cityName,
           JSON.stringify(event.properties || {})
         ]
       );
@@ -96,6 +98,7 @@ export function createAnalyticsRepository(pool) {
            UNION ALL SELECT event_date, 'page_views', 'device', COALESCE(NULLIF(device_type, ''), 'unknown'), COUNT(*)::bigint FROM scoped WHERE event_type = 'page_view' GROUP BY event_date, COALESCE(NULLIF(device_type, ''), 'unknown')
            UNION ALL SELECT event_date, 'page_views', 'page', COALESCE(NULLIF(page_path, ''), '/'), COUNT(*)::bigint FROM scoped WHERE event_type = 'page_view' GROUP BY event_date, COALESCE(NULLIF(page_path, ''), '/')
            UNION ALL SELECT event_date, 'page_views', 'country', COALESCE(NULLIF(country_code, ''), 'unknown'), COUNT(*)::bigint FROM scoped WHERE event_type = 'page_view' GROUP BY event_date, COALESCE(NULLIF(country_code, ''), 'unknown')
+           UNION ALL SELECT event_date, 'page_views', 'city', COALESCE(NULLIF(city_name, ''), '未知城市'), COUNT(*)::bigint FROM scoped WHERE event_type = 'page_view' GROUP BY event_date, COALESCE(NULLIF(city_name, ''), '未知城市')
            UNION ALL SELECT event_date, 'project_enters', 'project', COALESCE(NULLIF(project_code, ''), 'unknown'), COUNT(*)::bigint FROM scoped WHERE event_type = 'project_enter' GROUP BY event_date, COALESCE(NULLIF(project_code, ''), 'unknown')
          )
          INSERT INTO analytics_daily_metrics (metric_date, metric_key, dimension_type, dimension_value, metric_value)
@@ -144,7 +147,7 @@ export function createAnalyticsRepository(pool) {
           values
         ),
         pool.query(
-          `SELECT id, occurred_at, event_type, page_path, project_code, referrer_host, device_type, country_code, user_id, properties
+          `SELECT id, occurred_at, event_type, page_path, project_code, referrer_host, device_type, country_code, city_name, user_id, properties
            FROM analytics_events
            WHERE event_date BETWEEN $1::date AND $2::date AND event_type <> 'page_view'
            ORDER BY occurred_at DESC, id DESC LIMIT 8`,
@@ -228,7 +231,7 @@ export function createAnalyticsRepository(pool) {
       const pageSize = Math.min(Math.max(Number(limit) || 50, 1), 100);
       values.push(pageSize + 1);
       const result = await pool.query(
-        `SELECT id, occurred_at, event_type, page_path, project_code, referrer_host, device_type, country_code, user_id, properties
+        `SELECT id, occurred_at, event_type, page_path, project_code, referrer_host, device_type, country_code, city_name, user_id, properties
          FROM analytics_events WHERE ${clauses.join(" AND ")}
          ORDER BY occurred_at DESC, id DESC LIMIT $${values.length}`,
         values

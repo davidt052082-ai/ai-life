@@ -36,6 +36,7 @@ const event = {
   screenHeight: 900,
   ipHash: "a".repeat(64),
   countryCode: null,
+  cityName: null,
   properties: { title: "智能穿戴" }
 };
 
@@ -102,6 +103,27 @@ test("event list preserves a partial final page and only emits a cursor when ano
 
   assert.equal(result.events.length, 1);
   assert.equal(result.nextCursor, null);
+});
+
+test("city migration and repository persist the trusted city dimension", async () => {
+  const sql = await fs.readFile(new URL("../db/migrations/009_analytics_city_and_exclusion.sql", import.meta.url), "utf8");
+  assert.match(sql, /ADD COLUMN city_name text/);
+  assert.match(sql, /CREATE INDEX analytics_events_city_date_idx/);
+
+  const pool = createPool();
+  const repository = createAnalyticsRepository(pool);
+  await repository.recordEvent({ ...event, cityName: "上海" });
+
+  assert.match(pool.calls[0].text, /city_name/);
+  assert.equal(pool.calls[0].values.at(-2), "上海");
+});
+
+test("city breakdown maps missing trusted city data to an explicit unknown label", async () => {
+  const pool = createPool([{ dimension_value: "未知城市", metric_value: "2", unique_visitors: "2" }]);
+  const items = await createAnalyticsRepository(pool).getBreakdown({ from: "2026-08-01", to: "2026-08-02", dimension: "city" });
+
+  assert.deepEqual(items, [{ value: "未知城市", count: 2, uniqueVisitors: 2 }]);
+  assert.match(pool.calls[0].text, /city_name/);
 });
 
 test("funnel separates registered and unregistered visitors without double-counting a browser", async () => {

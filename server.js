@@ -26,6 +26,7 @@ import { createStudyPlanRouter } from "./src/routes/studyPlanRoutes.js";
 import { createStudyPeopleRouter } from "./src/routes/studyPeopleRoutes.js";
 import { renderShareImagePng as defaultRenderShareImagePng } from "./src/shareImage.js";
 import { createSlidingWindowRateLimiter } from "./src/analytics/rateLimiter.js";
+import { createAnalyticsExclusionList } from "./src/analytics/excludedTraffic.js";
 import { startAnalyticsMaintenance } from "./src/analytics/maintenance.js";
 import { normalizeServerEvent } from "./src/analytics/normalizeEvent.js";
 
@@ -53,6 +54,9 @@ export function createApp(options = {}) {
   const analyticsRateLimiter = options.analyticsRateLimiter || createSlidingWindowRateLimiter();
   const analyticsIpSalt = options.analyticsIpSalt ?? process.env.ANALYTICS_IP_SALT ?? "";
   const trustProxy = options.trustProxy ?? process.env.TRUST_PROXY === "true";
+  const analyticsExcludedTraffic = options.analyticsExcludedTraffic || createAnalyticsExclusionList(
+    options.analyticsExcludedIps ?? process.env.ANALYTICS_EXCLUDED_IPS ?? ""
+  );
   const analytics = analyticsRepository && {
     record(event) {
       return analyticsRepository.recordEvent(normalizeServerEvent({
@@ -64,6 +68,7 @@ export function createApp(options = {}) {
     }
   };
 
+  app.set("trust proxy", trustProxy);
   app.use(cookieParser(sessionSecret));
 
   if (userRepository && sessionService && analyticsRepository) {
@@ -71,6 +76,7 @@ export function createApp(options = {}) {
       repository: analyticsRepository,
       sessionService,
       rateLimiter: analyticsRateLimiter,
+      excludedTraffic: analyticsExcludedTraffic,
       ipSalt: analyticsIpSalt,
       trustProxy
     }));
