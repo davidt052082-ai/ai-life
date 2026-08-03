@@ -1,6 +1,6 @@
 # AI Life
 
-AI Life 是一个带账号、项目授权和 PostgreSQL 存储的项目入口。目前包含“智能穿戴监测系统”和“学习计划日历”；用户登录后只能看到后台授予访问权限的项目。
+AI Life 是一个带账号、项目授权和 PostgreSQL 存储的项目入口。目前包含“智能穿戴监测系统”、“学习计划日历”和“交易分析”；用户登录后只能看到后台授予访问权限的项目。
 
 ## 本机运行
 
@@ -38,6 +38,7 @@ AI Life 是一个带账号、项目授权和 PostgreSQL 存储的项目入口。
 - 所有注册用户会自动加入“默认分组”；该分组预置“智能穿戴监测系统”的访问权限。
 - “管理组”只包含管理员；管理员身份自动加入或移出该组，并通过该组获得所有现有及未来项目的访问权限。管理组由系统维护，不能在后台手动修改成员或项目授权。
 - 学习计划日历不属于默认分组。管理员需在后台的“分组与权限”中向目标分组开通该项目，再将用户加入该分组。
+- 交易分析是独立部署的仪表盘。AI Life 仅在授权后跳转；管理员需在后台向目标分组开通该项目。
 - 装备、锚点、布局和方案均按“用户 + 项目”写入 PostgreSQL。
 - 学习计划日历按登录账号保存计划规则，手机和电脑登录同一账号即可同步；日历课程由规则自动生成。
 - 首次进入穿戴项目时，会询问是否导入该浏览器旧的本地数据；导入只执行一次。
@@ -62,7 +63,7 @@ AI Life 是一个带账号、项目授权和 PostgreSQL 存储的项目入口。
 
 ## 切换云端 PostgreSQL
 
-部署环境只需设置云数据库提供的 `DATABASE_URL`、强随机 `SESSION_SECRET`、`ADMIN_EMAIL`、`NODE_ENV=production`，以及可选的 `ANALYTICS_IP_SALT` / `TRUST_PROXY` / `ANALYTICS_EXCLUDED_IPS`，执行一次 `npm run db:migrate` 后启动同一服务即可。前端和应用代码不需要修改。
+部署环境只需设置云数据库提供的 `DATABASE_URL`、强随机 `SESSION_SECRET`、`ADMIN_EMAIL`、`NODE_ENV=production`，以及交易分析独立部署地址 `TRADE_ANALYSIS_URL`（必须是绝对 HTTP(S) URL），再按需设置 `ANALYTICS_IP_SALT` / `TRUST_PROXY` / `ANALYTICS_EXCLUDED_IPS`，执行一次 `npm run db:migrate` 后启动同一服务即可。前端和应用代码不需要修改。
 
 原有的纯静态 Cloudflare Pages 部署不能承载账号、会话和 PostgreSQL API；正式发布应使用支持 Node.js 服务和数据库连接的运行环境。
 
