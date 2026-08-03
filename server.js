@@ -24,7 +24,9 @@ import { createAdminAnalyticsRouter } from "./src/routes/adminAnalyticsRoutes.js
 import { createWearableRouter } from "./src/routes/wearableRoutes.js";
 import { createStudyPlanRouter } from "./src/routes/studyPlanRoutes.js";
 import { createStudyPeopleRouter } from "./src/routes/studyPeopleRoutes.js";
+import { createTradeAnalysisPageHandler } from "./src/routes/tradeAnalysisPage.js";
 import { renderShareImagePng as defaultRenderShareImagePng } from "./src/shareImage.js";
+import { normalizeTradeAnalysisUrl } from "./src/trade-analysis/targetUrl.js";
 import { createSlidingWindowRateLimiter } from "./src/analytics/rateLimiter.js";
 import { createAnalyticsExclusionList } from "./src/analytics/excludedTraffic.js";
 import { startAnalyticsMaintenance } from "./src/analytics/maintenance.js";
@@ -56,6 +58,9 @@ export function createApp(options = {}) {
   const trustProxy = options.trustProxy ?? process.env.TRUST_PROXY === "true";
   const analyticsExcludedTraffic = options.analyticsExcludedTraffic || createAnalyticsExclusionList(
     options.analyticsExcludedIps ?? process.env.ANALYTICS_EXCLUDED_IPS ?? ""
+  );
+  const tradeAnalysisUrl = normalizeTradeAnalysisUrl(
+    options.tradeAnalysisUrl ?? process.env.TRADE_ANALYSIS_URL
   );
   const analytics = analyticsRepository && {
     record(event) {
@@ -242,6 +247,11 @@ export function createApp(options = {}) {
       next(error);
     }
   });
+  app.get("/projects/trade-analysis", createTradeAnalysisPageHandler({
+    repository: userRepository,
+    sessionService,
+    targetUrl: tradeAnalysisUrl
+  }));
   app.get("/study-plan/schedule.js", (_req, res) => {
     res.sendFile(path.join(__dirname, "src", "study-plan", "schedule.js"));
   });
