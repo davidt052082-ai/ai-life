@@ -89,6 +89,27 @@ export function createStudyPlanRouter({ repository, peopleRepository, projectRep
     });
   }));
 
+  router.patch("/:id", route(async (req, res) => {
+    const plan = readPlanInput(req.body);
+    const person = await peopleRepository.findPerson({
+      id: plan.personId,
+      userId: req.user.id,
+      projectId: req.project.id
+    });
+    if (!person) throw inputError("请选择当前账号的人物。");
+    const updated = await repository.updatePlan({
+      id: req.params.id,
+      userId: req.user.id,
+      projectId: req.project.id,
+      plan
+    });
+    if (!updated) {
+      res.status(404).json({ error: "PLAN_NOT_FOUND", message: "学习计划不存在。" });
+      return;
+    }
+    res.json({ plan: updated });
+  }));
+
   router.delete("/:id", route(async (req, res) => {
     const deleted = await repository.deletePlan({
       id: req.params.id,
