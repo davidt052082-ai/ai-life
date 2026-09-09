@@ -61,6 +61,29 @@ export function createStudyPlanRepository(pool) {
       return toStudyPlan(result.rows[0]);
     },
 
+    async updatePlan({ id, userId, projectId, plan }) {
+      const result = await pool.query(
+        `WITH updated AS (
+           UPDATE study_plans
+           SET person_id = $4, subject = $5, location = $6,
+               start_date = $7, start_time = $8, end_time = $9,
+               study_days = $10, rest_days = $11, target_study_days = $12,
+               updated_at = now()
+           WHERE id = $1 AND user_id = $2 AND project_id = $3
+           RETURNING *
+         )
+         SELECT ${PLAN_FIELDS}
+         FROM updated sp
+         JOIN study_people p ON p.id = sp.person_id AND p.user_id = sp.user_id AND p.project_id = sp.project_id`,
+        [
+          id, userId, projectId, plan.personId, plan.subject, plan.location,
+          plan.startDate, plan.startTime, plan.endTime,
+          plan.studyDays, plan.restDays, plan.targetStudyDays
+        ]
+      );
+      return toStudyPlan(result.rows[0]);
+    },
+
     async deletePlan({ id, userId, projectId }) {
       const result = await pool.query(
         "DELETE FROM study_plans WHERE id = $1 AND user_id = $2 AND project_id = $3",

@@ -40,3 +40,37 @@ test("repository maps PostgreSQL rows to browser plan fields", async () => {
     studyDays: 1, restDays: 0, targetStudyDays: 3, createdAt: "created", updatedAt: "updated"
   });
 });
+
+test("updating a plan preserves ownership scope and maps the returned plan", async () => {
+  const { createStudyPlanRepository } = await import("../src/repositories/studyPlanRepository.js");
+  const calls = [];
+  const repository = createStudyPlanRepository({
+    query: async (text, values) => {
+      calls.push({ text, values });
+      return {
+        rows: [{
+          id: "plan-a", person_id: "person-b", person_name: "小红", subject: "阅读", location: "书房",
+          start_date: "2026-09-10", start_time: "19:00:00", end_time: "20:00:00",
+          study_days: 3, rest_days: 1, target_study_days: 12,
+          created_at: "created", updated_at: "updated"
+        }],
+        rowCount: 1
+      };
+    }
+  });
+  const plan = {
+    personId: "person-b", subject: "阅读", location: "书房", startDate: "2026-09-10",
+    startTime: "19:00", endTime: "20:00", studyDays: 3, restDays: 1, targetStudyDays: 12
+  };
+
+  const updated = await repository.updatePlan({ id: "plan-a", userId: "user-a", projectId: "project-a", plan });
+
+  assert.match(calls[0].text, /WHERE id = \$1 AND user_id = \$2 AND project_id = \$3/);
+  assert.deepEqual(calls[0].values, [
+    "plan-a", "user-a", "project-a", "person-b", "阅读", "书房", "2026-09-10",
+    "19:00", "20:00", 3, 1, 12
+  ]);
+  assert.equal(updated.id, "plan-a");
+  assert.equal(updated.personName, "小红");
+  assert.equal(updated.createdAt, "created");
+});
