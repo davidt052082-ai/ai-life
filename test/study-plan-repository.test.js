@@ -41,6 +41,23 @@ test("repository maps PostgreSQL rows to browser plan fields", async () => {
   });
 });
 
+test("repository preserves PostgreSQL date values without UTC day rollback", async () => {
+  const { createStudyPlanRepository } = await import("../src/repositories/studyPlanRepository.js");
+  const repository = createStudyPlanRepository({
+    query: async () => ({
+      rows: [{
+        id: "plan-tz", person_id: "person-a", person_name: "小明", subject: "数学", location: "书房",
+        start_date: new Date(2026, 8, 10), start_time: "16:30:00", end_time: "18:30:00",
+        study_days: 1, rest_days: 0, target_study_days: 1, created_at: "created", updated_at: "updated"
+      }],
+      rowCount: 1
+    })
+  });
+
+  const [plan] = await repository.listPlans({ userId: "user-a", projectId: "project-a" });
+  assert.equal(plan.startDate, "2026-09-10");
+});
+
 test("updating a plan preserves ownership scope and maps the returned plan", async () => {
   const { createStudyPlanRepository } = await import("../src/repositories/studyPlanRepository.js");
   const calls = [];
