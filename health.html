@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>腹型减脂 | AI Life</title>
+  <style>
+    :root { --ink:#173d2a; --green:#2c8054; --mint:#eaf7ee; --line:#d7e6dc; --text:#17241d; --muted:#617369; --danger:#b24040; --card:#fff; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--text); font-family:"PingFang SC","Microsoft YaHei",sans-serif; background:#f4f8f5; }
+    .page { width:min(1120px,calc(100% - 28px)); margin:auto; padding:24px 0 92px; } header { display:flex; justify-content:space-between; align-items:center; gap:16px; } h1 { margin:0; font-size:26px; } h2 { margin:0 0 12px; font-size:19px; } p { line-height:1.55; } .muted { color:var(--muted); } .nav { display:flex; gap:8px; overflow:auto; padding:20px 0 16px; } .tab { flex:0 0 auto; border:0; border-radius:999px; background:#e4eee7; color:var(--ink); padding:10px 14px; font:inherit; cursor:pointer; } .tab[aria-selected="true"] { background:var(--ink); color:white; } .panel { display:none; } .panel.active { display:block; } .grid { display:grid; gap:14px; grid-template-columns:repeat(12,1fr); } .card { grid-column:span 12; padding:18px; border:1px solid var(--line); border-radius:16px; background:var(--card); box-shadow:0 3px 16px #173d2a0a; } .hero { color:white; background:linear-gradient(135deg,#173d2a,#2c8054); } .score { font-size:44px; font-weight:800; } .progress { height:8px; overflow:hidden; border-radius:99px; background:#d9eadf; } .progress>span { display:block; height:100%; border-radius:inherit; background:var(--green); } .hero .progress { background:#ffffff44; } .hero .progress>span { background:#b6f3c4; }
+    .actions { display:grid; gap:10px; grid-template-columns:repeat(2,minmax(0,1fr)); } button, input { font:inherit; } .action, .primary, .secondary { min-height:48px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:white; color:var(--ink); cursor:pointer; } .action.done { border-color:#71b88c; background:var(--mint); } .action:disabled { opacity:.65; cursor:wait; } .primary { color:white; background:var(--green); border-color:var(--green); } .secondary { background:#f3f8f4; } .measurements { display:grid; gap:10px; grid-template-columns:1fr 1fr auto; } input { width:100%; min-height:48px; border:1px solid var(--line); border-radius:10px; padding:0 12px; } .notice { padding:12px; border-radius:10px; background:#fff6e6; color:#77531c; } .list { display:grid; gap:9px; } .item { padding:12px; border-radius:10px; background:#f7faf8; } .snackbar { position:fixed; left:50%; bottom:20px; z-index:3; display:none; align-items:center; gap:18px; min-width:280px; padding:13px 16px; border-radius:12px; transform:translateX(-50%); color:white; background:#173d2a; box-shadow:0 10px 28px #0004; } .snackbar.show { display:flex; } .snackbar button { border:0; color:#b6f3c4; background:transparent; font-weight:700; cursor:pointer; } [hidden] { display:none !important; } #status { min-height:20px; margin:10px 0; color:var(--danger); } .table { width:100%; border-collapse:collapse; } .table td,.table th { padding:10px 6px; border-bottom:1px solid var(--line); text-align:left; } .photo-input { display:none; }
+    @media (min-width:760px) { .half { grid-column:span 6; } .third { grid-column:span 4; } .actions { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media (max-width:500px) { .measurements { grid-template-columns:1fr 1fr; } .measurements .primary { grid-column:span 2; } header .muted { display:none; } }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header><div><p class="muted">健康管理 / 腹型减脂</p><h1>今天，先完成最重要的一件事</h1></div><a class="secondary" href="/">项目首页</a></header>
+    <nav class="nav" aria-label="健康管理导航">
+      <button class="tab" type="button" data-tab="today" aria-selected="true">今日</button><button class="tab" type="button" data-tab="plan">计划</button><button class="tab" type="button" data-tab="diet">饮食</button><button class="tab" type="button" data-tab="trends">趋势</button><button class="tab" type="button" data-tab="compare">计划 vs 实际</button><button class="tab" type="button" data-tab="report">周报</button><button class="tab" type="button" data-tab="settings">设置</button>
+    </nav>
+    <p id="status" role="status" aria-live="polite"></p>
+
+    <section id="today" class="panel active" aria-label="今日">
+      <div class="grid"><article class="card hero half"><div class="muted" style="color:#d6edda">今日完成度</div><div id="completion" class="score">--%</div><div class="progress"><span id="completionBar" style="width:0"></span></div><p id="remaining">正在读取今日任务…</p></article><article class="card half"><h2>饮水 / 喝茶</h2><p id="hydration">0 / 1700 ml</p><div class="progress"><span id="hydrationBar" style="width:0"></span></div><div class="actions" style="margin-top:12px"><button class="action" data-hydration="200" type="button">水 +200 ml</button><button class="action" data-hydration="300" type="button">水 +300 ml</button><button class="action" data-hydration="500" type="button">水 +500 ml</button><button class="action" data-tea="200" type="button">茶 +200 ml</button><button class="action" data-tea="300" type="button">茶 +300 ml</button></div></article>
+        <article class="card"><h2>此刻优先</h2><p id="highlight">加载中…</p><div id="quickActions" class="actions"></div></article>
+        <article class="card half"><h2>三餐拍照</h2><p class="muted">照片会安全保存为“待 AI 分析”，暂不生成营养估算。</p><div class="actions"><label class="action">早餐拍照<input class="photo-input" data-meal="breakfast" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" /></label><label class="action">午餐拍照<input class="photo-input" data-meal="lunch" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" /></label><label class="action">晚餐拍照<input class="photo-input" data-meal="dinner" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" /></label></div><div id="mealList" class="list" style="margin-top:12px"></div></article>
+        <article class="card half"><h2>身体记录</h2><div class="measurements"><input id="weightKg" type="number" min="20" max="400" step="0.1" inputmode="decimal" placeholder="体重 kg" aria-label="体重 kg" /><input id="waistCm" type="number" min="30" max="250" step="0.1" inputmode="decimal" placeholder="腰围 cm" aria-label="腰围 cm" /><button id="saveMeasurement" class="primary" type="button">保存</button></div></article>
+        <article id="notificationCard" class="card" hidden><h2>站内提醒</h2><div id="notifications" class="list"></div></article>
+      </div>
+    </section>
+    <section id="plan" class="panel"><article class="card"><h2>本周计划</h2><div id="planView" class="list"></div></article></section>
+    <section id="diet" class="panel"><article class="card"><h2>饮食记录</h2><p>三餐照片显示为“待 AI 分析”；接入 AI 前不会展示推测的食物或营养素。</p><div id="dietView" class="list"></div></article></section>
+    <section id="trends" class="panel"><article class="card"><h2>身体趋势</h2><div id="trendView" class="list"></div></article></section>
+    <section id="compare" class="panel"><article class="card"><h2>计划 vs 实际</h2><div id="compareView"></div></article></section>
+    <section id="report" class="panel"><article class="card"><h2>自动周报</h2><div id="reportView" class="list"></div></article></section>
+    <section id="settings" class="panel"><article class="card"><h2>设置</h2><div class="measurements"><input id="hydrationTarget" type="number" min="500" max="5000" step="100" aria-label="每日饮水目标" /><input id="cutoff" type="time" aria-label="训练归属截止时间" value="01:00" /><label class="action"><input id="massageEnabled" type="checkbox" /> 显示揉腹舒适辅助</label><button id="saveSettings" class="primary" type="button">保存设置</button></div><p class="muted">揉腹仅用于腹胀/便秘时的舒适辅助，不计入减脂评分。</p></article></section>
+  </main>
+  <div id="snackbar" class="snackbar"><span id="snackbarText"></span><button id="undoButton" type="button">撤销</button></div>
+  <script type="module" src="/health-client.js"></script>
+</body>
+</html>

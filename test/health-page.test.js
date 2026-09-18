@@ -1,0 +1,25 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+
+test("health page contains action-first mobile controls and no fabricated nutrition", async () => {
+  const [html, client] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
+  ]);
+  for (const label of ["今日完成度", "水 +200 ml", "水 +300 ml", "水 +500 ml", "早餐拍照", "周报", "待 AI 分析"]) assert.ok(`${html}\n${client}`.includes(label));
+  assert.match(client, /const API_ROOT = "\/api\/projects\/health\/health"/);
+  assert.match(client, /Idempotency-Key/);
+  assert.match(client, /canvas\.toBlob/);
+  assert.match(client, /撤销/);
+  assert.doesNotMatch(`${html}\n${client}`, /localStorage|indexedDB|Notification\.requestPermission/);
+  assert.doesNotMatch(client, /estimated_kcal|nutrition/);
+});
+
+test("server wires health project API and protected page", async () => {
+  const source = await fs.readFile(new URL("../server.js", import.meta.url), "utf8");
+  assert.match(source, /createHealthRepository/);
+  assert.match(source, /createHealthRouter/);
+  assert.match(source, /\/api\/projects\/:code\/health/);
+  assert.match(source, /\/projects\/health/);
+});

@@ -11,6 +11,8 @@ export const STUDY_PLAN_PROJECT_ID = "b406a418-20d1-4c15-a797-33ad4c904492";
 export const STUDY_PLAN_PROJECT_CODE = "study-plan";
 export const TRADE_ANALYSIS_PROJECT_ID = "6cc66a0d-0ad2-4873-ac2c-e2e4a4bb6f1a";
 export const TRADE_ANALYSIS_PROJECT_CODE = "trade-analysis";
+export const HEALTH_PROJECT_ID = "8d82f809-4b39-4054-8718-3fec10c1f3cb";
+export const HEALTH_PROJECT_CODE = "health";
 
 export function validateDatabaseUrl(connectionString) {
   if (typeof connectionString !== "string" || !/^postgres(?:ql)?:\/\//i.test(connectionString)) {
@@ -58,6 +60,20 @@ async function seedWearableProject(client) {
   );
 }
 
+async function seedHealthProject(client) {
+  await client.query(
+    `INSERT INTO projects (id, code, name, description, route, cover_image_url, sort_order)
+     VALUES ($1, $2, $3, $4, $5, NULL, $6)
+     ON CONFLICT (code) DO UPDATE SET
+       name = EXCLUDED.name,
+       description = EXCLUDED.description,
+       route = EXCLUDED.route,
+       cover_image_url = EXCLUDED.cover_image_url,
+       sort_order = EXCLUDED.sort_order`,
+    [HEALTH_PROJECT_ID, HEALTH_PROJECT_CODE, "健康管理", "腹型减脂的计划、打卡、趋势与周报。", "/projects/health", 4]
+  );
+}
+
 export async function applyMigrations(pool, options = {}) {
   const migrationsDir = options.migrationsDir || defaultMigrationsDir;
   const client = await pool.connect();
@@ -82,6 +98,7 @@ export async function applyMigrations(pool, options = {}) {
     }
 
     await seedWearableProject(client);
+    await seedHealthProject(client);
   } finally {
     client.release();
   }

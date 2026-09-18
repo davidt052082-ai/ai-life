@@ -43,6 +43,7 @@ test("listMigrationFiles returns SQL files in lexical order", async () => {
     "007_project_cover_generation.sql",
     "008_operations_analytics.sql",
     "009_analytics_city_and_exclusion.sql",
-    "010_trade_analysis_project.sql"
+    "010_trade_analysis_project.sql",
+    "011_health_management.sql"
   ]);
 });
