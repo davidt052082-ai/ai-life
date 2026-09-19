@@ -39,14 +39,17 @@ async function request(path, options = {}) {
   return data;
 }
 
-function todayScheduleAction(item) {
-  const target = { measurement: "measurement", meal: "meals", hydration: "hydration", walk: "quick-actions", training: "quick-actions" }[item.action];
-  if (!target) return '<span class="muted">计划提醒</span>';
-  return `<button class="secondary schedule-action" type="button" data-today-target="${target}">去完成</button>`;
+function scheduleButton(item) {
+  const label = `${item.time} · ${item.label}`;
+  const task = { walk: "post-meal-walk", training: "training" }[item.action];
+  if (task) return `<button class="action" type="button" data-task="${task}">${escapeHtml(label)}</button>`;
+  const target = { measurement: "measurement", meal: "meals", hydration: "hydration" }[item.action];
+  if (!target) return `<button class="action" type="button" disabled>${escapeHtml(label)} · 计划提醒</button>`;
+  return `<button class="action" type="button" data-today-target="${target}">${escapeHtml(label)}</button>`;
 }
 
 function renderTodaySchedule(data) {
-  $("#todaySchedule").innerHTML = data.plan.schedule.map((item) => `<div class="item schedule-item"><div><strong class="schedule-time">${escapeHtml(item.time)}</strong><br>${escapeHtml(item.label)}<br><span class="muted">${escapeHtml(item.frequency)} · ${escapeHtml(item.detail)}</span></div>${todayScheduleAction(item)}</div>`).join("");
+  $("#todaySchedule").innerHTML = data.plan.schedule.map(scheduleButton).join("");
 }
 
 function renderToday(data) {
@@ -57,8 +60,7 @@ function renderToday(data) {
   $("#remaining").textContent = data.remainingTasks.length ? `还差：${data.remainingTasks.map((item) => item.label).join("、")}` : "今天的计划都完成了。";
   $("#hydration").textContent = `${data.hydration.totalMl} / ${data.plan.hydrationTargetMl} ml`;
   $("#hydrationBar").style.width = `${Math.min(100, Math.round(data.hydration.totalMl * 100 / data.plan.hydrationTargetMl))}%`;
-  $("#highlight").textContent = data.highlightedTask ? data.highlightedTask.label : "保持节奏，今天已完成重点任务。";
-  $("#quickActions").innerHTML = data.remainingTasks.filter((item) => !item.id.endsWith("-photo") && item.id !== "hydration").map((item) => `<button class="action" data-task="${escapeHtml(item.id)}" type="button">${escapeHtml(item.label)}</button>`).join("");
+  $("#highlight").textContent = data.highlightedTask ? `此刻优先：${data.highlightedTask.label}` : "此刻优先：今天的重点事项已完成。";
   $("#mealList").innerHTML = data.mealPhotoCount ? Object.keys(data.meals).map((type) => `<div class="item">${escapeHtml({ breakfast:"早餐", lunch:"午餐", dinner:"晚餐", snack:"加餐" }[type] || type)}：待 AI 分析</div>`).join("") : '<div class="muted">尚未上传餐食照片。</div>';
   const card = $("#notificationCard"); const notifications = data.notifications || [];
   card.hidden = notifications.length === 0;

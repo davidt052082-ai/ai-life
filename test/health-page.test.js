@@ -67,3 +67,16 @@ test("today and plan views render the API schedule and expose all hydration size
   for (const label of ["水 +1000 ml", "茶 +500 ml", "茶 +1000 ml", "计划提醒"]) assert.ok(page.includes(label));
   assert.doesNotMatch(page, /水 \+300 ml|茶 \+300 ml/);
 });
+
+test("today schedule merges priority into action-style plan buttons", async () => {
+  const [html, client] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /id="todaySchedule" class="actions"/);
+  assert.doesNotMatch(html, /<h2>此刻优先<\/h2>/);
+  assert.match(client, /此刻优先：/);
+  assert.match(client, /scheduleButton/);
+  assert.match(client, /class="action"/);
+  assert.match(client, /disabled>.*计划提醒/);
+});
