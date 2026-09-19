@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildDailySummary, buildReminderCandidates, buildWeeklyComparison } from "../src/health/summary.js";
+import { buildDailySummary, buildMetricTrends, buildReminderCandidates, buildWeeklyComparison } from "../src/health/summary.js";
 
 test("daily summary totals water and tea and counts meals", () => {
   const summary = buildDailySummary({ date: "2026-09-17", events: [
@@ -13,10 +13,30 @@ test("daily summary totals water and tea and counts meals", () => {
 });
 
 test("comparison reports actual value, percentage, and difference", () => {
-  assert.deepEqual(buildWeeklyComparison({ targets: { walks: 10 }, actuals: { walks: 8 } }), [{ id: "walks", planned: 10, actual: 8, completionRate: 80, difference: -2 }]);
+  assert.deepEqual(buildWeeklyComparison({ targets: { walks: 10 }, actuals: { walks: 8 } }), [{ id: "walks", name: "饭后步行", unit: "次", planned: 10, actual: 8, completionRate: 80, difference: -2 }]);
 });
 
 test("reminder is only created for an incomplete contextual task", () => {
   const candidates = buildReminderCandidates({ now: "2026-09-18T12:35:00+08:00", summary: { meals: {}, remainingTasks: [] } });
   assert.deepEqual(candidates, [{ kind: "lunch-photo", message: "午餐拍照，拍一张即可完成" }]);
+});
+
+test("metric trends aggregate daily events, meals, and body measurements", () => {
+  const trends = buildMetricTrends({
+    startDate: "2026-09-01", endDate: "2026-09-07",
+    measurements: [{ occurredAt: "2026-09-01T00:00:00Z", weightKg: 79, waistCm: 95 }, { occurredAt: "2026-09-07T00:00:00Z", weightKg: 78.2, waistCm: 94 }],
+    events: [
+      { planDate: "2026-09-07", eventType: "hydration", payload: { type: "water", volumeMl: 300 } },
+      { planDate: "2026-09-07", eventType: "hydration", payload: { type: "tea", volumeMl: 200 } },
+      { planDate: "2026-09-07", eventType: "workout", payload: { sessionType: "cardio" } },
+      { planDate: "2026-09-07", eventType: "no_alcohol", payload: { value: true } }
+    ],
+    meals: [{ planDate: "2026-09-07" }, { planDate: "2026-09-07" }]
+  });
+  assert.equal(trends.daily.length, 7);
+  assert.deepEqual(trends.daily.at(-1), { date: "2026-09-07", cardioSessions: 1, strengthSessions: 0, postMealWalks: 0, waterMl: 300, teaMl: 200, fluidMl: 500, mealPhotos: 2, noAlcohol: 1, noLateSnack: 0, noSugaryDrink: 0 });
+  assert.equal(trends.current.weight.value, 78.2);
+  assert.equal(trends.current.waist.value, 94);
+  assert.equal(trends.current.fluid.value, 500);
+  assert.equal(trends.current.mealPhotos.value, 2);
 });

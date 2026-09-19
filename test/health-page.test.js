@@ -23,3 +23,33 @@ test("server wires health project API and protected page", async () => {
   assert.match(source, /\/api\/projects\/:code\/health/);
   assert.match(source, /\/projects\/health/);
 });
+
+test("health page has selectable weekly plan and localized metric rendering", async () => {
+  const [html, client] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /id="weekOverview"/);
+  assert.match(html, /id="planDetail"/);
+  assert.match(client, /\/today\?date=/);
+  assert.match(client, /徒手\/抱物深蹲/);
+  assert.match(client, /壶铃硬拉/);
+  assert.match(client, /item\.name/);
+  assert.match(client, /item\.unit/);
+  assert.match(client, /formatMetric/);
+});
+
+test("trend page renders current metrics, real series, and explicit unavailable states", async () => {
+  const [html, client] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
+  ]);
+  const page = `${html}\n${client}`;
+  assert.match(page, /核心结果/);
+  assert.match(page, /执行与行为/);
+  assert.match(page, /待接入指标/);
+  assert.match(page, /阶段性体检/);
+  assert.match(client, /buildTrendSvg/);
+  assert.match(client, /暂未采集/);
+  assert.match(client, /未录入体检数据/);
+});

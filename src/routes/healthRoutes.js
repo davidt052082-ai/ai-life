@@ -6,7 +6,7 @@ import { Router } from "express";
 import { requireProjectAccess, requireUser } from "../auth/middleware.js";
 import { getDailyPlan, getPlanDate } from "../health/plan.js";
 import { getOutcomeStatus, weeklyExecutionScore } from "../health/scoring.js";
-import { buildDailySummary, buildReminderCandidates, buildWeeklyComparison } from "../health/summary.js";
+import { buildDailySummary, buildMetricTrends, buildReminderCandidates, buildWeeklyComparison } from "../health/summary.js";
 
 const CHECKIN_TYPES = new Set(["post_meal_walk", "workout", "baduanjin", "no_alcohol", "no_late_snack", "no_sugary_drink", "abdominal_massage"]);
 const MIME_EXTENSIONS = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" };
@@ -140,7 +140,17 @@ export function createHealthRouter({ repository, projectRepository = repository,
   router.get("/meals", route(async (req, res) => { const settings = await repository.getSettings(scope(req)); const date = req.query.date ? toDate(req.query.date) : nowDate(settings.timezone); res.json({ meals: await repository.listMeals({ ...scope(req), startDate: date }) }); }));
   router.delete("/meals/:id", route(async (req, res) => { if (!await repository.deleteMeal({ id: req.params.id, ...scope(req) })) { res.status(404).json({ error: "MEAL_NOT_FOUND", message: "餐食照片不存在。" }); return; } res.status(204).end(); }));
 
-  router.get("/trends", route(async (req, res) => { const settings = await repository.getSettings(scope(req)); const endDate = req.query.endDate ? toDate(req.query.endDate) : nowDate(settings.timezone); const startDate = req.query.startDate ? toDate(req.query.startDate) : addDays(endDate, -27); res.json({ measurements: await repository.listMeasurements({ ...scope(req), startDate, endDate }) }); }));
+  router.get("/trends", route(async (req, res) => {
+    const settings = await repository.getSettings(scope(req));
+    const endDate = req.query.endDate ? toDate(req.query.endDate) : nowDate(settings.timezone);
+    const startDate = req.query.startDate ? toDate(req.query.startDate) : addDays(endDate, -27);
+    const [measurements, events, meals] = await Promise.all([
+      repository.listMeasurements({ ...scope(req), startDate, endDate }),
+      repository.listEvents({ ...scope(req), startDate, endDate }),
+      repository.listMeals({ ...scope(req), startDate, endDate })
+    ]);
+    res.json({ measurements, ...buildMetricTrends({ startDate, endDate, measurements, events, meals }) });
+  }));
 
   async function weekly(req, res, includeOutcome) {
     const settings = await repository.getSettings(scope(req));
