@@ -1,6 +1,12 @@
+import { createHealthOfflineQueue, isNetworkFailure } from "/health-offline.js";
+
 const API_ROOT = "/api/projects/health/health";
 const state = { today: null, planDate: null, undoEventId: null, undoTimer: null };
 const $ = (selector) => document.querySelector(selector);
+const OFFLINE_QUEUEABLE_PATHS = new Set(["/hydration", "/checkins", "/measurements", "/meals"]);
+let deferredInstallPrompt = null;
+let offlineQueue = null;
+try { offlineQueue = createHealthOfflineQueue(); } catch { /* 浏览器不支持 IndexedDB 时继续使用在线模式。 */ }
 
 const WEEK_TRAINING = [
   { label: "休息 + 周复盘", duration: "5–10 分钟" }, { label: "快走", duration: "40 分钟" },
@@ -28,11 +34,40 @@ function tableRows(rows) { return rows.map((row) => `<tr>${row.map((cell) => `<t
 function scheduleRows(schedule) { return schedule.map((item) => [item.time, item.label, item.frequency, item.detail]); }
 function formatMetric(value, unit) { return `${Number(value).toLocaleString("zh-CN")}${unit ? ` ${unit}` : ""}`; }
 
+async function updatePwaStatus() {
+  const element = $("#pwaStatus");
+  const pending = offlineQueue ? await offlineQueue.count().catch(() => 0) : 0;
+  if (!navigator.onLine) {
+    element.textContent = pending ? `当前离线，${pending} 项记录待联网同步。` : "当前离线，可继续记录，联网后自动同步。";
+    element.className = "pwa-status offline";
+    element.hidden = false;
+    return;
+  }
+  if (pending) {
+    element.textContent = `${pending} 项记录待同步。`;
+    element.className = "pwa-status";
+    element.hidden = false;
+    return;
+  }
+  element.hidden = true;
+}
+
+function canQueueOffline(path, options) {
+  return Boolean(offlineQueue && options.method === "POST" && OFFLINE_QUEUEABLE_PATHS.has(path));
+}
+
 async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   if (options.body && !(options.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (["POST", "PATCH", "DELETE"].includes(options.method)) headers.set("Idempotency-Key", key());
-  const response = await fetch(`${API_ROOT}${path}`, { ...options, headers });
+  let response;
+  try { response = await fetch(`${API_ROOT}${path}`, { ...options, headers }); }
+  catch (error) {
+    if (!canQueueOffline(path, options) || !isNetworkFailure(error)) throw error;
+    await offlineQueue.enqueue({ path, method: options.method, headers: Object.fromEntries(headers), body: options.body });
+    await updatePwaStatus();
+    return { queued: true };
+  }
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || "请求失败，请稍后重试。");
@@ -100,13 +135,19 @@ async function selectPlanDate(date) {
 }
 
 async function refreshToday() { renderToday(await request("/today")); }
+async function syncQueuedRequests() {
+  if (!offlineQueue || !navigator.onLine) { await updatePwaStatus(); return; }
+  const completed = await offlineQueue.replay(API_ROOT);
+  await updatePwaStatus();
+  if (completed) await refreshToday();
+}
 function showUndo(eventId, text) {
   state.undoEventId = eventId; clearTimeout(state.undoTimer); $("#snackbarText").textContent = text; $("#snackbar").classList.add("show");
   state.undoTimer = setTimeout(() => { state.undoEventId = null; $("#snackbar").classList.remove("show"); }, 6000);
 }
 async function submitAction(button, path, body, undoText) {
   const original = button.textContent; button.disabled = true; button.textContent = "提交中…"; showError();
-  try { const data = await request(path, { method: "POST", body: JSON.stringify(body) }); await refreshToday(); if (data.event?.id) showUndo(data.event.id, undoText); }
+  try { const data = await request(path, { method: "POST", body: JSON.stringify(body) }); if (data?.queued) { showError("已离线保存，待联网同步。"); return; } await refreshToday(); await syncQueuedRequests(); if (data.event?.id) showUndo(data.event.id, undoText); }
   catch (error) { showError(errorMessage(error)); button.textContent = "记录失败，点击重试"; return; }
   finally { button.disabled = false; if (button.textContent === "提交中…") button.textContent = original; }
 }
@@ -119,7 +160,7 @@ async function compressImage(file) {
 
 async function uploadMeal(input) {
   const file = input.files?.[0]; if (!file) return; showError(); input.disabled = true;
-  try { const blob = await compressImage(file); const form = new FormData(); form.append("image", blob, "meal.webp"); form.append("mealType", input.dataset.meal); form.append("capturedAt", new Date().toISOString()); await request("/meals", { method: "POST", body: form }); await refreshToday(); }
+  try { const blob = await compressImage(file); const form = new FormData(); form.append("image", blob, "meal.webp"); form.append("mealType", input.dataset.meal); form.append("capturedAt", new Date().toISOString()); const data = await request("/meals", { method: "POST", body: form }); if (data?.queued) { showError("已离线保存，待联网同步。"); return; } await refreshToday(); await syncQueuedRequests(); }
   catch (error) { showError(errorMessage(error)); } finally { input.disabled = false; input.value = ""; }
 }
 
@@ -187,7 +228,7 @@ async function loadTab(tab) {
 document.addEventListener("click", async (event) => {
   const planDate = event.target.closest("[data-plan-date]"); if (planDate) { try { await selectPlanDate(planDate.dataset.planDate); } catch (error) { showError(errorMessage(error)); } return; }
   const tab = event.target.closest("[data-tab]"); if (tab) { document.querySelectorAll(".tab").forEach((item) => item.setAttribute("aria-selected", String(item === tab))); document.querySelectorAll(".panel").forEach((item) => item.classList.toggle("active", item.id === tab.dataset.tab)); try { await loadTab(tab.dataset.tab); } catch (error) { showError(errorMessage(error)); } return; }
-  const todayTarget = event.target.closest("[data-today-target]"); if (todayTarget) { const selector = { measurement: "#measurementCard", meals: "#mealCard", hydration: "#hydrationCard", "quick-actions": "#quickActions" }[todayTarget.dataset.todayTarget]; document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  const todayTarget = event.target.closest("[data-today-target]"); if (todayTarget) { const selector = { measurement: "#measurementCard", meals: "#mealCard", hydration: "#hydrationCard" }[todayTarget.dataset.todayTarget]; document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
   const hydration = event.target.closest("[data-hydration], [data-tea]"); if (hydration) { const volume = Number(hydration.dataset.hydration || hydration.dataset.tea); submitAction(hydration, "/hydration", { type: hydration.dataset.tea ? "tea" : "water", volumeMl: volume }, `已记录 +${volume} ml`); return; }
   const task = event.target.closest("[data-task]"); if (task) { const type = task.dataset.task === "training" ? (state.today.plan.training.type === "baduanjin" ? "baduanjin" : "workout") : task.dataset.task.replaceAll("-", "_"); const sessionType = task.dataset.task === "training" && ["cardio", "strength"].includes(state.today.plan.training.type) ? state.today.plan.training.type : undefined; submitAction(task, "/checkins", { type, sessionType }, "已记录，点击撤销"); return; }
   const notice = event.target.closest("[data-notification]"); if (notice) { try { await request(`/notifications/${notice.dataset.notification}`, { method: "PATCH" }); await refreshToday(); } catch (error) { showError(errorMessage(error)); } }
@@ -196,4 +237,10 @@ document.addEventListener("change", (event) => { if (event.target.matches(".phot
 $("#undoButton").addEventListener("click", async () => { if (!state.undoEventId) return; try { await request(`/events/${state.undoEventId}/undo`, { method: "POST", body: "{}" }); $("#snackbar").classList.remove("show"); await refreshToday(); } catch (error) { showError(errorMessage(error)); } });
 $("#saveMeasurement").addEventListener("click", async (event) => submitAction(event.currentTarget, "/measurements", { weightKg: $("#weightKg").value || null, waistCm: $("#waistCm").value || null }, "身体记录已保存"));
 $("#saveSettings").addEventListener("click", async () => { try { await request("/settings", { method: "PATCH", body: JSON.stringify({ hydrationTargetMl: Number($("#hydrationTarget").value), planDayCutoff: $("#cutoff").value, abdominalMassageEnabled: $("#massageEnabled").checked }) }); await refreshToday(); showError(); } catch (error) { showError(errorMessage(error)); } });
-refreshToday().catch((error) => showError(errorMessage(error)));
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/health-sw.js", { scope: "/" }).catch(() => {});
+window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); deferredInstallPrompt = event; $("#installHealthApp").hidden = false; });
+$("#installHealthButton").addEventListener("click", async () => { if (!deferredInstallPrompt) return; await deferredInstallPrompt.prompt(); deferredInstallPrompt = null; $("#installHealthApp").hidden = true; });
+$("#dismissInstall").addEventListener("click", () => { $("#installHealthApp").hidden = true; });
+window.addEventListener("online", () => { syncQueuedRequests().catch(() => updatePwaStatus()); });
+window.addEventListener("offline", () => { updatePwaStatus(); });
+refreshToday().catch((error) => showError(errorMessage(error))).finally(() => { updatePwaStatus(); syncQueuedRequests().catch(() => updatePwaStatus()); });

@@ -80,3 +80,30 @@ test("today schedule merges priority into action-style plan buttons", async () =
   assert.match(client, /class="action"/);
   assert.match(client, /disabled>.*计划提醒/);
 });
+
+test("health PWA exposes manifest, service worker and a static-only cache policy", async () => {
+  const [manifest, worker, server] = await Promise.all([
+    fs.readFile(new URL("../public/health-manifest.webmanifest", import.meta.url), "utf8"),
+    fs.readFile(new URL("../public/health-sw.js", import.meta.url), "utf8"),
+    fs.readFile(new URL("../server.js", import.meta.url), "utf8")
+  ]);
+  assert.equal(JSON.parse(manifest).display, "standalone");
+  assert.match(worker, /CACHE_NAME = "ai-life-health-shell-v1"/);
+  assert.match(worker, /"\/projects\/health"/);
+  assert.doesNotMatch(worker, /\/api\/projects\/health\/health/);
+  for (const path of ["/health-manifest.webmanifest", "/health-icon.svg", "/health-sw.js", "/health-offline.js"]) assert.ok(server.includes(path));
+});
+
+test("health page registers PWA, reports sync state, and queues network-only write failures", async () => {
+  const [html, client] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
+  ]);
+  assert.match(html, /rel="manifest" href="\/health-manifest\.webmanifest"/);
+  assert.match(html, /id="pwaStatus"/);
+  assert.match(html, /id="installHealthApp"/);
+  assert.match(client, /navigator\.serviceWorker\.register\("\/health-sw\.js"/);
+  assert.match(client, /beforeinstallprompt/);
+  assert.match(client, /offlineQueue\.enqueue/);
+  assert.match(client, /addEventListener\("online"/);
+});

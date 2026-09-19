@@ -298,6 +298,19 @@ export function createApp(options = {}) {
   app.get("/health-client.js", (_req, res) => {
     res.sendFile(path.join(__dirname, "health-client.js"));
   });
+  app.get("/health-offline.js", (_req, res) => {
+    res.sendFile(path.join(__dirname, "health-offline.js"));
+  });
+  app.get("/health-manifest.webmanifest", (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "health-manifest.webmanifest"));
+  });
+  app.get("/health-icon.svg", (_req, res) => {
+    res.sendFile(path.join(__dirname, "public", "health-icon.svg"));
+  });
+  app.get("/health-sw.js", (_req, res) => {
+    res.set("Service-Worker-Allowed", "/");
+    res.sendFile(path.join(__dirname, "public", "health-sw.js"));
+  });
 
   app.locals.syncConfiguredAdmin = async () => {
     if (adminRepository && String(adminEmail).trim()) {
