@@ -86,7 +86,7 @@ export function createHealthRouter({ repository, projectRepository = repository,
 
   router.post("/hydration", route(async (req, res) => {
     const body = req.body || {};
-    if (!["water", "tea"].includes(body.type) || !Number.isInteger(body.volumeMl) || ![200, 300, 500].includes(body.volumeMl)) throw inputError("饮水类型或容量无效。");
+    if (!["water", "tea"].includes(body.type) || !Number.isInteger(body.volumeMl) || ![200, 500, 1000].includes(body.volumeMl)) throw inputError("饮水类型或容量无效。");
     const settings = await repository.getSettings(scope(req));
     const occurredAt = body.occurredAt ? new Date(body.occurredAt) : new Date();
     if (Number.isNaN(occurredAt.valueOf())) throw inputError("发生时间无效。");

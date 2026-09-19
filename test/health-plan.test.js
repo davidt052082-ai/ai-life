@@ -21,3 +21,17 @@ test("training before the cutoff belongs to the prior plan day", () => {
 test("lunch is highlighted in its time window", () => {
   assert.equal(getHighlightedTask("2026-09-18T12:35:00+08:00", { meals: {} })?.id, "lunch-photo");
 });
+
+test("daily plan exposes the reusable schedule with the day training", () => {
+  const plan = getDailyPlan("2026-09-18");
+  assert.deepEqual(plan.schedule.map((item) => item.id), [
+    "measurement", "breakfast-photo", "morning-hydration", "lunch-photo",
+    "lunch-walk", "afternoon-hydration", "dinner-photo", "dinner-walk",
+    "training", "missing-items", "sleep-prep", "sleep"
+  ]);
+  assert.deepEqual(plan.schedule.find((item) => item.id === "training"), {
+    id: "training", time: "20:00", label: "壶铃基础力量", frequency: "按周计划",
+    detail: "训练提醒 + 完成打卡", action: "training"
+  });
+  assert.equal(plan.schedule.find((item) => item.id === "sleep").action, "reminder");
+});

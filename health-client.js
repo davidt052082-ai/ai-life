@@ -2,20 +2,6 @@ const API_ROOT = "/api/projects/health/health";
 const state = { today: null, planDate: null, undoEventId: null, undoTimer: null };
 const $ = (selector) => document.querySelector(selector);
 
-const DAILY_SCHEDULE = [
-  ["07:00–07:30", "起床、如厕后称体重", "每天 1 次", "记录体重"],
-  ["07:30", "早餐", "每天", "拍照一次"],
-  ["10:30", "饮水检查", "每天", "摄入不足时轻提醒"],
-  ["12:30", "午餐", "每天", "拍照一次"],
-  ["12:50–13:05", "饭后快走 10–15 分钟", "每天 1–2 次", "一键打卡"],
-  ["15:30", "饮水/无糖茶检查", "每天", "摄入不足时轻提醒"],
-  ["18:30", "晚餐", "每天", "拍照一次"],
-  ["18:50–19:05", "饭后快走 10–15 分钟", "建议每天", "一键打卡"],
-  ["20:00", "当日主训练", "按周计划", "训练提醒 + 完成打卡"],
-  ["21:30", "当天漏项检查", "每天", "只提示未完成重点任务"],
-  ["22:30", "减少屏幕刺激，准备睡眠", "每天", "可选提醒"],
-  ["23:00 前后", "睡眠", "每天", "后续由手环自动采集"]
-];
 const WEEK_TRAINING = [
   { label: "休息 + 周复盘", duration: "5–10 分钟" }, { label: "快走", duration: "40 分钟" },
   { label: "弹力带 + 徒手力量", duration: "30–35 分钟" }, { label: "快走", duration: "40 分钟" },
@@ -39,6 +25,7 @@ function addDays(date, amount) { const value = new Date(`${date}T12:00:00`); val
 function mondayOf(date) { const value = new Date(`${date}T12:00:00`); value.setDate(value.getDate() - ((value.getDay() + 6) % 7)); return value.toISOString().slice(0, 10); }
 function dateLabel(date) { return new Intl.DateTimeFormat("zh-CN", { month: "numeric", day: "numeric", weekday: "short" }).format(new Date(`${date}T12:00:00`)); }
 function tableRows(rows) { return rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`).join(""); }
+function scheduleRows(schedule) { return schedule.map((item) => [item.time, item.label, item.frequency, item.detail]); }
 function formatMetric(value, unit) { return `${Number(value).toLocaleString("zh-CN")}${unit ? ` ${unit}` : ""}`; }
 
 async function request(path, options = {}) {
@@ -52,8 +39,19 @@ async function request(path, options = {}) {
   return data;
 }
 
+function todayScheduleAction(item) {
+  const target = { measurement: "measurement", meal: "meals", hydration: "hydration", walk: "quick-actions", training: "quick-actions" }[item.action];
+  if (!target) return '<span class="muted">计划提醒</span>';
+  return `<button class="secondary schedule-action" type="button" data-today-target="${target}">去完成</button>`;
+}
+
+function renderTodaySchedule(data) {
+  $("#todaySchedule").innerHTML = data.plan.schedule.map((item) => `<div class="item schedule-item"><div><strong class="schedule-time">${escapeHtml(item.time)}</strong><br>${escapeHtml(item.label)}<br><span class="muted">${escapeHtml(item.frequency)} · ${escapeHtml(item.detail)}</span></div>${todayScheduleAction(item)}</div>`).join("");
+}
+
 function renderToday(data) {
   state.today = data;
+  renderTodaySchedule(data);
   $("#completion").textContent = `${data.completionPercent}%`;
   $("#completionBar").style.width = `${data.completionPercent}%`;
   $("#remaining").textContent = data.remainingTasks.length ? `还差：${data.remainingTasks.map((item) => item.label).join("、")}` : "今天的计划都完成了。";
@@ -84,7 +82,7 @@ function renderExerciseTable(title, rows) {
 
 function renderPlanDetail(data) {
   const training = data.plan.training;
-  const schedule = `<div class="plan-section"><h3>${escapeHtml(dateLabel(data.date))} · 每日时间表</h3><table class="plan-table"><thead><tr><th>时间</th><th>事项</th><th>频次</th><th>系统动作</th></tr></thead><tbody>${tableRows(DAILY_SCHEDULE)}</tbody></table></div>`;
+  const schedule = `<div class="plan-section"><h3>${escapeHtml(dateLabel(data.date))} · 每日时间表</h3><table class="plan-table"><thead><tr><th>时间</th><th>事项</th><th>频次</th><th>系统动作</th></tr></thead><tbody>${tableRows(scheduleRows(data.plan.schedule))}</tbody></table></div>`;
   const trainingCard = `<div class="plan-section"><h3>20:00 左右主训练</h3><div class="item"><strong>${escapeHtml(training.label)}</strong> · ${training.minMinutes === training.maxMinutes ? training.minMinutes : `${training.minMinutes}–${training.maxMinutes}`} 分钟<br><span class="muted">${escapeHtml(TRAINING_DETAILS[training.type] || "按计划完成训练。")}</span>${training.countsTowardScore === false ? "<br><span class=\"muted\">恢复任务，不计入核心减脂评分。</span>" : ""}</div></div>`;
   const details = [schedule, trainingCard];
   if (training.type === "strength" && training.label.includes("徒手")) details.push(renderExerciseTable("周二力量训练模板", TUESDAY_EXERCISES));
@@ -187,6 +185,7 @@ async function loadTab(tab) {
 document.addEventListener("click", async (event) => {
   const planDate = event.target.closest("[data-plan-date]"); if (planDate) { try { await selectPlanDate(planDate.dataset.planDate); } catch (error) { showError(errorMessage(error)); } return; }
   const tab = event.target.closest("[data-tab]"); if (tab) { document.querySelectorAll(".tab").forEach((item) => item.setAttribute("aria-selected", String(item === tab))); document.querySelectorAll(".panel").forEach((item) => item.classList.toggle("active", item.id === tab.dataset.tab)); try { await loadTab(tab.dataset.tab); } catch (error) { showError(errorMessage(error)); } return; }
+  const todayTarget = event.target.closest("[data-today-target]"); if (todayTarget) { const selector = { measurement: "#measurementCard", meals: "#mealCard", hydration: "#hydrationCard", "quick-actions": "#quickActions" }[todayTarget.dataset.todayTarget]; document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
   const hydration = event.target.closest("[data-hydration], [data-tea]"); if (hydration) { const volume = Number(hydration.dataset.hydration || hydration.dataset.tea); submitAction(hydration, "/hydration", { type: hydration.dataset.tea ? "tea" : "water", volumeMl: volume }, `已记录 +${volume} ml`); return; }
   const task = event.target.closest("[data-task]"); if (task) { const type = task.dataset.task === "training" ? (state.today.plan.training.type === "baduanjin" ? "baduanjin" : "workout") : task.dataset.task.replaceAll("-", "_"); const sessionType = task.dataset.task === "training" && ["cardio", "strength"].includes(state.today.plan.training.type) ? state.today.plan.training.type : undefined; submitAction(task, "/checkins", { type, sessionType }, "已记录，点击撤销"); return; }
   const notice = event.target.closest("[data-notification]"); if (notice) { try { await request(`/notifications/${notice.dataset.notification}`, { method: "PATCH" }); await refreshToday(); } catch (error) { showError(errorMessage(error)); } }

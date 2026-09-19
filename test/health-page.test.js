@@ -7,7 +7,7 @@ test("health page contains action-first mobile controls and no fabricated nutrit
     fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
     fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
   ]);
-  for (const label of ["今日完成度", "水 +200 ml", "水 +300 ml", "水 +500 ml", "早餐拍照", "周报", "待 AI 分析"]) assert.ok(`${html}\n${client}`.includes(label));
+  for (const label of ["今日完成度", "水 +200 ml", "水 +500 ml", "水 +1000 ml", "茶 +200 ml", "茶 +500 ml", "茶 +1000 ml", "早餐拍照", "周报", "待 AI 分析"]) assert.ok(`${html}\n${client}`.includes(label));
   assert.match(client, /const API_ROOT = "\/api\/projects\/health\/health"/);
   assert.match(client, /Idempotency-Key/);
   assert.match(client, /canvas\.toBlob/);
@@ -52,4 +52,18 @@ test("trend page renders current metrics, real series, and explicit unavailable 
   assert.match(client, /buildTrendSvg/);
   assert.match(client, /暂未采集/);
   assert.match(client, /未录入体检数据/);
+});
+
+test("today and plan views render the API schedule and expose all hydration sizes", async () => {
+  const [html, client] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
+  ]);
+  const page = `${html}\n${client}`;
+  assert.match(html, /id="todaySchedule"/);
+  assert.match(client, /data\.plan\.schedule/);
+  assert.match(client, /renderTodaySchedule/);
+  assert.match(client, /hydration: "hydration"/);
+  for (const label of ["水 +1000 ml", "茶 +500 ml", "茶 +1000 ml", "计划提醒"]) assert.ok(page.includes(label));
+  assert.doesNotMatch(page, /水 \+300 ml|茶 \+300 ml/);
 });

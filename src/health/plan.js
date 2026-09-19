@@ -27,6 +27,23 @@ export function getPlanDate(instant, eventType, timezone = "Asia/Shanghai", cuto
   return `${parts.hour}:${parts.minute}` < cutoff ? shiftDate(date, -1) : date;
 }
 
+function getDailySchedule(training) {
+  return [
+    { id: "measurement", time: "07:00–07:30", label: "起床、如厕后称体重", frequency: "每天 1 次", detail: "记录体重", action: "measurement" },
+    { id: "breakfast-photo", time: "07:30", label: "早餐", frequency: "每天", detail: "拍照一次", action: "meal" },
+    { id: "morning-hydration", time: "10:30", label: "饮水检查", frequency: "每天", detail: "摄入不足时轻提醒", action: "hydration" },
+    { id: "lunch-photo", time: "12:30", label: "午餐", frequency: "每天", detail: "拍照一次", action: "meal" },
+    { id: "lunch-walk", time: "12:50–13:05", label: "饭后快走 10–15 分钟", frequency: "每天 1–2 次", detail: "一键打卡", action: "walk" },
+    { id: "afternoon-hydration", time: "15:30", label: "饮水/无糖茶检查", frequency: "每天", detail: "摄入不足时轻提醒", action: "hydration" },
+    { id: "dinner-photo", time: "18:30", label: "晚餐", frequency: "每天", detail: "拍照一次", action: "meal" },
+    { id: "dinner-walk", time: "18:50–19:05", label: "饭后快走 10–15 分钟", frequency: "建议每天", detail: "一键打卡", action: "walk" },
+    { id: "training", time: "20:00", label: training.label, frequency: "按周计划", detail: "训练提醒 + 完成打卡", action: "training" },
+    { id: "missing-items", time: "21:30", label: "当天漏项检查", frequency: "每天", detail: "只提示未完成重点任务", action: "reminder" },
+    { id: "sleep-prep", time: "22:30", label: "减少屏幕刺激，准备睡眠", frequency: "每天", detail: "可选提醒", action: "reminder" },
+    { id: "sleep", time: "23:00 前后", label: "睡眠", frequency: "每天", detail: "后续由手环自动采集", action: "reminder" }
+  ];
+}
+
 export function getDailyPlan(date, timezone = "Asia/Shanghai", settings = {}) {
   const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
   const tasks = [
@@ -42,7 +59,7 @@ export function getDailyPlan(date, timezone = "Asia/Shanghai", settings = {}) {
   const training = WEEKLY_TRAINING[weekday];
   tasks.push({ id: "training", label: training.label, priority: "high", countsTowardScore: training.countsTowardScore });
   if (settings.abdominalMassageEnabled) tasks.push({ id: "abdominal-massage", label: "揉腹 5–10 分钟（舒适辅助）", priority: "low", countsTowardScore: false });
-  return { date, timezone, hydrationTargetMl: settings.hydrationTargetMl || 1700, training, tasks };
+  return { date, timezone, hydrationTargetMl: settings.hydrationTargetMl || 1700, training, tasks, schedule: getDailySchedule(training) };
 }
 
 export function getHighlightedTask(instant, summary = {}, timezone = "Asia/Shanghai") {
