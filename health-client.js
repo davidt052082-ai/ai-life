@@ -84,8 +84,7 @@ function scheduleButton(item, data) {
     const done = Boolean(data.measurementRecorded);
     return `<button class="action${done ? " done" : ""}" type="button" data-measurement-action>${escapeHtml(label)}${done ? " · 已记录" : ""}</button>`;
   }
-  if (item.action === "hydration") return `<button class="action" type="button" data-today-target="hydration">${escapeHtml(label)}</button>`;
-  const type = item.action === "training" ? (data.plan.training.type === "baduanjin" ? "baduanjin" : "workout") : item.action === "walk" ? "post_meal_walk" : null;
+  const type = item.action === "training" ? (data.plan.training.type === "baduanjin" ? "baduanjin" : "workout") : item.action === "walk" ? "post_meal_walk" : item.action === "checkin" ? item.checkinType : null;
   if (type) {
     const eventId = data.actionEvents?.[item.id] || ""; const done = Boolean(eventId);
     return `<button class="action${done ? " done" : ""}" type="button" data-checkin-type="${type}" data-task-id="${item.id}" data-event-id="${eventId}">${escapeHtml(label)}${done ? " · 已完成 · 再点取消" : ""}</button>`;
@@ -94,7 +93,7 @@ function scheduleButton(item, data) {
 }
 
 function renderTodaySchedule(data) {
-  $("#todaySchedule").innerHTML = data.plan.schedule.map((item) => scheduleButton(item, data)).join("");
+  $("#todaySchedule").innerHTML = data.plan.schedule.filter((item) => item.action !== "hydration").map((item) => scheduleButton(item, data)).join("");
 }
 
 function showFluidValue(type, value) {
@@ -114,8 +113,6 @@ function renderToday(data) {
   $("#completion").textContent = `${data.completionPercent}%`;
   $("#completionBar").style.width = `${data.completionPercent}%`;
   $("#remaining").textContent = data.remainingTasks.length ? `还差：${data.remainingTasks.map((item) => item.label).join("、")}` : "今天的计划都完成了。";
-  $("#hydration").textContent = `${data.hydration.totalMl} / ${data.plan.hydrationTargetMl} ml`;
-  $("#hydrationBar").style.width = `${Math.min(100, Math.round(data.hydration.totalMl * 100 / data.plan.hydrationTargetMl))}%`;
   renderFluidEditor(data);
   $("#highlight").textContent = data.highlightedTask ? `此刻优先：${data.highlightedTask.label}` : "此刻优先：今天的重点事项已完成。";
   const card = $("#notificationCard"); const notifications = data.notifications || [];
@@ -182,8 +179,7 @@ async function submitFluidDelta(type, slider) {
     const data = await request("/hydration", { method: "POST", body: JSON.stringify({ type, volumeMl: delta }) });
     if (data?.queued) {
       state.today.hydration[property] += delta; state.today.hydration.totalMl += delta;
-      $("#hydration").textContent = `${state.today.hydration.totalMl} / ${state.today.plan.hydrationTargetMl} ml`;
-      $("#hydrationBar").style.width = `${Math.min(100, Math.round(state.today.hydration.totalMl * 100 / state.today.plan.hydrationTargetMl))}%`;
+      showFluidValue(type, state.today.hydration[property]);
       showError("已离线保存，待联网同步。");
       return;
     }
@@ -272,7 +268,6 @@ document.addEventListener("click", async (event) => {
   const tab = event.target.closest("[data-tab]"); if (tab) { document.querySelectorAll(".tab").forEach((item) => item.setAttribute("aria-selected", String(item === tab))); document.querySelectorAll(".panel").forEach((item) => item.classList.toggle("active", item.id === tab.dataset.tab)); try { await loadTab(tab.dataset.tab); } catch (error) { showError(errorMessage(error)); } return; }
   const mealAction = event.target.closest("[data-meal-action]"); if (mealAction) { const input = $("#mealPhotoInput"); input.dataset.meal = mealAction.dataset.mealAction; input.click(); return; }
   const measurementAction = event.target.closest("[data-measurement-action]"); if (measurementAction) { const dialog = $("#measurementDialog"); if (typeof dialog.showModal === "function") dialog.showModal(); else showError("当前浏览器不支持身体记录窗口。"); return; }
-  const todayTarget = event.target.closest("[data-today-target]"); if (todayTarget) { $("#hydrationCard")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
   const hydration = event.target.closest("[data-hydration], [data-tea]"); if (hydration) { const volume = Number(hydration.dataset.hydration || hydration.dataset.tea); submitAction(hydration, "/hydration", { type: hydration.dataset.tea ? "tea" : "water", volumeMl: volume }, `已记录 +${volume} ml`); return; }
   const task = event.target.closest("[data-checkin-type]"); if (task) {
     const eventId = task.dataset.eventId;

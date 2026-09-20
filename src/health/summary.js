@@ -21,7 +21,7 @@ export function buildDailySummary({ date, timezone = "Asia/Shanghai", settings =
   const completed = new Set(events.map((event) => event.eventType));
   const mealTypes = Object.fromEntries(meals.map((meal) => [meal.mealType, true]));
   const actionEvents = Object.fromEntries(events
-    .filter((event) => ["lunch-walk", "dinner-walk", "training"].includes(event.payload?.taskId))
+    .filter((event) => ["lunch-walk", "dinner-walk", "training", "no-alcohol", "no-late-snack", "no-sugary-drink"].includes(event.payload?.taskId))
     .map((event) => [event.payload.taskId, event.id]));
   const plan = getDailyPlan(date, timezone, settings);
   const remainingTasks = plan.tasks.filter((task) => {

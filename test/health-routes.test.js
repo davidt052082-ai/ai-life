@@ -63,7 +63,12 @@ test("checkin stores only compatible schedule task ids", async () => {
   const req = (body) => ({ body, get: () => "key", user: { id: "u" }, project: { id: "p" } });
   const accepted = response(); await handler(req({ type: "post_meal_walk", taskId: "lunch-walk" }), accepted);
   const rejected = response(); await handler(req({ type: "post_meal_walk", taskId: "training" }), rejected);
+  const evening = response(); await handler(req({ type: "no_alcohol", taskId: "no-alcohol" }), evening);
+  const eveningRejected = response(); await handler(req({ type: "no_late_snack", taskId: "no-alcohol" }), eveningRejected);
   assert.equal(accepted.statusCode, 201);
   assert.equal(calls[0].payload.taskId, "lunch-walk");
   assert.equal(rejected.statusCode, 400);
+  assert.equal(evening.statusCode, 201);
+  assert.equal(calls.at(-1).payload.taskId, "no-alcohol");
+  assert.equal(eveningRejected.statusCode, 400);
 });

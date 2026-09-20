@@ -18,12 +18,15 @@ test("daily summary exposes per-schedule completion and latest undoable event", 
     events: [
       { id: "walk-lunch", eventType: "post_meal_walk", payload: { taskId: "lunch-walk" } },
       { id: "walk-dinner", eventType: "post_meal_walk", payload: { taskId: "dinner-walk" } },
-      { id: "training", eventType: "workout", payload: { taskId: "training", sessionType: "strength" } }
+      { id: "training", eventType: "workout", payload: { taskId: "training", sessionType: "strength" } },
+      { id: "alcohol", eventType: "no_alcohol", payload: { taskId: "no-alcohol" } },
+      { id: "snack", eventType: "no_late_snack", payload: { taskId: "no-late-snack" } },
+      { id: "sugary", eventType: "no_sugary_drink", payload: { taskId: "no-sugary-drink" } }
     ],
     meals: [{ mealType: "breakfast" }],
     measurements: [{ id: "measure-1", weightKg: 75, waistCm: 88 }]
   });
-  assert.deepEqual(summary.actionEvents, { "lunch-walk": "walk-lunch", "dinner-walk": "walk-dinner", training: "training" });
+  assert.deepEqual(summary.actionEvents, { "lunch-walk": "walk-lunch", "dinner-walk": "walk-dinner", training: "training", "no-alcohol": "alcohol", "no-late-snack": "snack", "no-sugary-drink": "sugary" });
   assert.equal(summary.measurementRecorded, true);
   assert.equal(summary.meals.breakfast, true);
 });

@@ -12,7 +12,10 @@ const CHECKIN_TYPES = new Set(["post_meal_walk", "workout", "baduanjin", "no_alc
 const SCHEDULE_TASK_TYPES = {
   "lunch-walk": ["post_meal_walk"],
   "dinner-walk": ["post_meal_walk"],
-  training: ["workout", "baduanjin"]
+  training: ["workout", "baduanjin"],
+  "no-alcohol": ["no_alcohol"],
+  "no-late-snack": ["no_late_snack"],
+  "no-sugary-drink": ["no_sugary_drink"]
 };
 const MIME_EXTENSIONS = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" };
 

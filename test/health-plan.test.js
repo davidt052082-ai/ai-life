@@ -27,11 +27,16 @@ test("daily plan exposes the reusable schedule with the day training", () => {
   assert.deepEqual(plan.schedule.map((item) => item.id), [
     "measurement", "breakfast-photo", "morning-hydration", "lunch-photo",
     "lunch-walk", "afternoon-hydration", "dinner-photo", "dinner-walk",
-    "training", "missing-items", "sleep-prep", "sleep"
+    "training", "no-alcohol", "no-late-snack", "no-sugary-drink", "missing-items", "sleep-prep", "sleep"
   ]);
   assert.deepEqual(plan.schedule.find((item) => item.id === "training"), {
     id: "training", time: "20:00", label: "壶铃基础力量", frequency: "按周计划",
     detail: "训练提醒 + 完成打卡", action: "training"
   });
+  assert.deepEqual(plan.schedule.filter((item) => ["no-alcohol", "no-late-snack", "no-sugary-drink"].includes(item.id)), [
+    { id: "no-alcohol", time: "21:30", label: "无酒", frequency: "每天", detail: "晚间确认", action: "checkin", checkinType: "no_alcohol" },
+    { id: "no-late-snack", time: "21:30", label: "无夜宵", frequency: "每天", detail: "晚间确认", action: "checkin", checkinType: "no_late_snack" },
+    { id: "no-sugary-drink", time: "21:30", label: "无含糖饮料", frequency: "每天", detail: "晚间确认", action: "checkin", checkinType: "no_sugary_drink" }
+  ]);
   assert.equal(plan.schedule.find((item) => item.id === "sleep").action, "reminder");
 });

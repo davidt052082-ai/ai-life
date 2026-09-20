@@ -63,9 +63,24 @@ test("today and plan views render the API schedule and expose all hydration size
   assert.match(html, /id="todaySchedule"/);
   assert.match(client, /data\.plan\.schedule/);
   assert.match(client, /renderTodaySchedule/);
-  assert.match(client, /data-today-target="hydration"/);
+  assert.match(client, /filter\(\(item\) => item\.action !== "hydration"\)/);
   for (const label of ["水 +1000 ml", "茶 +500 ml", "茶 +1000 ml", "计划提醒"]) assert.ok(page.includes(label));
   assert.doesNotMatch(page, /水 \+300 ml|茶 \+300 ml/);
+});
+
+test("fluid card separates water and tea controls and hides hydration checks from today actions", async () => {
+  const [html, client, plan] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8"),
+    fs.readFile(new URL("../src/health/plan.js", import.meta.url), "utf8")
+  ]);
+  assert.doesNotMatch(html, /id="hydration"|id="hydrationBar"/);
+  assert.match(html, /饮水[\s\S]*data-fluid-slider="water"[\s\S]*水 \+200 ml/);
+  assert.match(html, /喝茶[\s\S]*data-fluid-slider="tea"[\s\S]*茶 \+200 ml/);
+  assert.match(client, /filter\(\(item\) => item\.action !== "hydration"\)/);
+  assert.doesNotMatch(client, /data-today-target="hydration"/);
+  assert.match(plan, /id: "morning-hydration"/);
+  assert.match(plan, /id: "afternoon-hydration"/);
 });
 
 test("today schedule merges priority into action-style plan buttons", async () => {
@@ -94,6 +109,7 @@ test("today page makes meals, measurements, completion and fluid editing availab
   for (const label of ["水 +200 ml", "水 +500 ml", "水 +1000 ml", "茶 +200 ml", "茶 +500 ml", "茶 +1000 ml"]) assert.ok(html.includes(label));
   assert.match(client, /data-meal-action/);
   assert.match(client, /data-measurement-action/);
+  assert.match(client, /item\.action === "checkin" \? item\.checkinType/);
   assert.match(client, /已完成 · 再点取消/);
   assert.match(client, /\/events\/\$\{eventId\}\/undo/);
   assert.match(client, /data-fluid-slider/);

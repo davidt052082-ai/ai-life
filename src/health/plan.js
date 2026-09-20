@@ -38,6 +38,9 @@ function getDailySchedule(training) {
     { id: "dinner-photo", time: "18:30", label: "晚餐", frequency: "每天", detail: "拍照一次", action: "meal" },
     { id: "dinner-walk", time: "18:50–19:05", label: "饭后快走 10–15 分钟", frequency: "建议每天", detail: "一键打卡", action: "walk" },
     { id: "training", time: "20:00", label: training.label, frequency: "按周计划", detail: "训练提醒 + 完成打卡", action: "training" },
+    { id: "no-alcohol", time: "21:30", label: "无酒", frequency: "每天", detail: "晚间确认", action: "checkin", checkinType: "no_alcohol" },
+    { id: "no-late-snack", time: "21:30", label: "无夜宵", frequency: "每天", detail: "晚间确认", action: "checkin", checkinType: "no_late_snack" },
+    { id: "no-sugary-drink", time: "21:30", label: "无含糖饮料", frequency: "每天", detail: "晚间确认", action: "checkin", checkinType: "no_sugary_drink" },
     { id: "missing-items", time: "21:30", label: "当天漏项检查", frequency: "每天", detail: "只提示未完成重点任务", action: "reminder" },
     { id: "sleep-prep", time: "22:30", label: "减少屏幕刺激，准备睡眠", frequency: "每天", detail: "可选提醒", action: "reminder" },
     { id: "sleep", time: "23:00 前后", label: "睡眠", frequency: "每天", detail: "后续由手环自动采集", action: "reminder" }
