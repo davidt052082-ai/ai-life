@@ -9,6 +9,11 @@ import { getOutcomeStatus, weeklyExecutionScore } from "../health/scoring.js";
 import { buildDailySummary, buildMetricTrends, buildReminderCandidates, buildWeeklyComparison } from "../health/summary.js";
 
 const CHECKIN_TYPES = new Set(["post_meal_walk", "workout", "baduanjin", "no_alcohol", "no_late_snack", "no_sugary_drink", "abdominal_massage"]);
+const SCHEDULE_TASK_TYPES = {
+  "lunch-walk": ["post_meal_walk"],
+  "dinner-walk": ["post_meal_walk"],
+  training: ["workout", "baduanjin"]
+};
 const MIME_EXTENSIONS = { "image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp" };
 
 function inputError(message) { const error = new Error(message); error.status = 400; error.code = "INVALID_INPUT"; return error; }
@@ -22,6 +27,10 @@ function idempotencyKey(req) {
   return value;
 }
 function nowDate(timezone) { return getPlanDate(new Date(), "hydration", timezone); }
+function validHydrationVolume(volumeMl) {
+  return [200, 500, 1000].includes(volumeMl)
+    || (Number.isInteger(volumeMl) && volumeMl !== 0 && Math.abs(volumeMl) <= 5000 && volumeMl % 100 === 0);
+}
 function dateRangeStart(date) { const value = new Date(`${date}T12:00:00Z`); value.setUTCDate(value.getUTCDate() - 6); return value.toISOString().slice(0, 10); }
 function weekStart(value) {
   const date = new Date(`${value}T12:00:00Z`);
@@ -50,11 +59,12 @@ function route(handler) {
 }
 
 async function collectDay(repository, scope, date, settings) {
-  const [events, meals] = await Promise.all([
+  const [events, meals, measurements] = await Promise.all([
     repository.listEvents({ ...scope, startDate: date, endDate: date }),
-    repository.listMeals({ ...scope, startDate: date, endDate: date })
+    repository.listMeals({ ...scope, startDate: date, endDate: date }),
+    repository.listMeasurements({ ...scope, startDate: date, endDate: date })
   ]);
-  return { events, meals, summary: buildDailySummary({ date, timezone: settings.timezone, settings, events, meals }) };
+  return { events, meals, measurements, summary: buildDailySummary({ date, timezone: settings.timezone, settings, events, meals, measurements }) };
 }
 
 function responseEvent(event) { return { event, event_id: event.eventId, sync_status: event.syncStatus, server_version: event.version }; }
@@ -86,22 +96,30 @@ export function createHealthRouter({ repository, projectRepository = repository,
 
   router.post("/hydration", route(async (req, res) => {
     const body = req.body || {};
-    if (!["water", "tea"].includes(body.type) || !Number.isInteger(body.volumeMl) || ![200, 500, 1000].includes(body.volumeMl)) throw inputError("饮水类型或容量无效。");
+    if (!["water", "tea"].includes(body.type) || !validHydrationVolume(body.volumeMl)) throw inputError("饮水类型或容量无效。");
     const settings = await repository.getSettings(scope(req));
     const occurredAt = body.occurredAt ? new Date(body.occurredAt) : new Date();
     if (Number.isNaN(occurredAt.valueOf())) throw inputError("发生时间无效。");
-    const event = await repository.createEvent({ id: randomUUID(), eventId: `hydration_${randomUUID()}`, ...scope(req), idempotencyKey: idempotencyKey(req), eventType: "hydration", payload: { type: body.type, volumeMl: body.volumeMl }, occurredAt, timezone: settings.timezone, planDate: getPlanDate(occurredAt, "hydration", settings.timezone, settings.planDayCutoff) });
+    const planDate = getPlanDate(occurredAt, "hydration", settings.timezone, settings.planDayCutoff);
+    if (body.volumeMl < 0) {
+      const events = await repository.listEvents({ ...scope(req), startDate: planDate, endDate: planDate });
+      const current = events.filter((event) => event.eventType === "hydration" && event.payload?.type === body.type)
+        .reduce((total, event) => total + Number(event.payload?.volumeMl || 0), 0);
+      if (current + body.volumeMl < 0) throw inputError("调整后饮水量不能小于 0 ml。");
+    }
+    const event = await repository.createEvent({ id: randomUUID(), eventId: `hydration_${randomUUID()}`, ...scope(req), idempotencyKey: idempotencyKey(req), eventType: "hydration", payload: { type: body.type, volumeMl: body.volumeMl }, occurredAt, timezone: settings.timezone, planDate });
     res.status(201).json(responseEvent(event));
   }));
 
   router.post("/checkins", route(async (req, res) => {
     const body = req.body || {};
     if (!CHECKIN_TYPES.has(body.type)) throw inputError("打卡类型无效。");
+    if (body.taskId && !SCHEDULE_TASK_TYPES[body.taskId]?.includes(body.type)) throw inputError("计划事项无效。");
     const settings = await repository.getSettings(scope(req));
     const occurredAt = body.occurredAt ? new Date(body.occurredAt) : new Date();
     if (Number.isNaN(occurredAt.valueOf())) throw inputError("发生时间无效。");
     const sessionType = ["cardio", "strength"].includes(body.sessionType) ? body.sessionType : null;
-    const event = await repository.createEvent({ id: randomUUID(), eventId: `${body.type}_${randomUUID()}`, ...scope(req), idempotencyKey: idempotencyKey(req), eventType: body.type, payload: { value: true, sessionType }, occurredAt, timezone: settings.timezone, planDate: getPlanDate(occurredAt, body.type, settings.timezone, settings.planDayCutoff) });
+    const event = await repository.createEvent({ id: randomUUID(), eventId: `${body.type}_${randomUUID()}`, ...scope(req), idempotencyKey: idempotencyKey(req), eventType: body.type, payload: { value: true, sessionType, taskId: body.taskId || null }, occurredAt, timezone: settings.timezone, planDate: getPlanDate(occurredAt, body.type, settings.timezone, settings.planDayCutoff) });
     res.status(201).json(responseEvent(event));
   }));
 

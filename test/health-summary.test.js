@@ -12,6 +12,22 @@ test("daily summary totals water and tea and counts meals", () => {
   assert.ok(summary.remainingTasks.length > 0);
 });
 
+test("daily summary exposes per-schedule completion and latest undoable event", () => {
+  const summary = buildDailySummary({
+    date: "2026-09-20",
+    events: [
+      { id: "walk-lunch", eventType: "post_meal_walk", payload: { taskId: "lunch-walk" } },
+      { id: "walk-dinner", eventType: "post_meal_walk", payload: { taskId: "dinner-walk" } },
+      { id: "training", eventType: "workout", payload: { taskId: "training", sessionType: "strength" } }
+    ],
+    meals: [{ mealType: "breakfast" }],
+    measurements: [{ id: "measure-1", weightKg: 75, waistCm: 88 }]
+  });
+  assert.deepEqual(summary.actionEvents, { "lunch-walk": "walk-lunch", "dinner-walk": "walk-dinner", training: "training" });
+  assert.equal(summary.measurementRecorded, true);
+  assert.equal(summary.meals.breakfast, true);
+});
+
 test("comparison reports actual value, percentage, and difference", () => {
   assert.deepEqual(buildWeeklyComparison({ targets: { walks: 10 }, actuals: { walks: 8 } }), [{ id: "walks", name: "饭后步行", unit: "次", planned: 10, actual: 8, completionRate: 80, difference: -2 }]);
 });

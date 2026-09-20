@@ -19,16 +19,51 @@ test("hydration route rejects invalid volume before persistence", async () => {
   assert.equal(created, false);
 });
 
-test("hydration route accepts 1000 ml and rejects removed 300 ml size", async () => {
+test("hydration route preserves quick volumes and accepts 100 ml slider deltas", async () => {
   const calls = [];
   const router = createHealthRouter({ repository: { getSettings: async () => ({ timezone: "Asia/Shanghai", planDayCutoff: "01:00" }), createEvent: async (event) => { calls.push(event); return event; } }, projectRepository: {}, sessionService: {}, healthProjectCode: "health", uploadDirectory: "/tmp/ai-life-health-test" });
   const handler = router.stack.find((layer) => layer.route?.path === "/hydration").route.stack.at(-1).handle;
   const response = () => ({ statusCode: 200, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } });
   const req = (volumeMl) => ({ body: { type: "tea", volumeMl }, get: () => "key", user: { id: "u" }, project: { id: "p" } });
   const accepted = response(); await handler(req(1000), accepted);
-  const rejected = response(); await handler(req(300), rejected);
+  const slider = response(); await handler(req(300), slider);
   assert.equal(accepted.statusCode, 201);
   assert.equal(calls[0].payload.volumeMl, 1000);
+  assert.equal(slider.statusCode, 201);
+  assert.equal(calls[1].payload.volumeMl, 300);
+});
+
+test("hydration rejects invalid slider deltas and adjustments below zero", async () => {
+  const calls = [];
+  const repository = {
+    getSettings: async () => ({ timezone: "Asia/Shanghai", planDayCutoff: "01:00" }),
+    listEvents: async () => [{ eventType: "hydration", payload: { type: "water", volumeMl: 500 } }],
+    createEvent: async (event) => { calls.push(event); return event; }
+  };
+  const router = createHealthRouter({ repository, projectRepository: {}, sessionService: {}, healthProjectCode: "health", uploadDirectory: "/tmp/ai-life-health-test" });
+  const handler = router.stack.find((layer) => layer.route?.path === "/hydration").route.stack.at(-1).handle;
+  const response = () => ({ statusCode: 200, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } });
+  const req = (volumeMl) => ({ body: { type: "water", volumeMl }, get: () => "key", user: { id: "u" }, project: { id: "p" } });
+  const accepted = response(); await handler(req(-100), accepted);
+  const invalid = response(); await handler(req(50), invalid);
+  const negative = response(); await handler(req(-600), negative);
+  assert.equal(accepted.statusCode, 201);
+  assert.equal(calls[0].payload.volumeMl, -100);
+  assert.equal(invalid.statusCode, 400);
+  assert.equal(negative.statusCode, 400);
+  assert.equal(calls.length, 1);
+});
+
+test("checkin stores only compatible schedule task ids", async () => {
+  const calls = [];
+  const repository = { getSettings: async () => ({ timezone: "Asia/Shanghai", planDayCutoff: "01:00" }), createEvent: async (event) => { calls.push(event); return event; } };
+  const router = createHealthRouter({ repository, projectRepository: {}, sessionService: {}, healthProjectCode: "health", uploadDirectory: "/tmp/ai-life-health-test" });
+  const handler = router.stack.find((layer) => layer.route?.path === "/checkins").route.stack.at(-1).handle;
+  const response = () => ({ statusCode: 200, body: null, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } });
+  const req = (body) => ({ body, get: () => "key", user: { id: "u" }, project: { id: "p" } });
+  const accepted = response(); await handler(req({ type: "post_meal_walk", taskId: "lunch-walk" }), accepted);
+  const rejected = response(); await handler(req({ type: "post_meal_walk", taskId: "training" }), rejected);
+  assert.equal(accepted.statusCode, 201);
+  assert.equal(calls[0].payload.taskId, "lunch-walk");
   assert.equal(rejected.statusCode, 400);
-  assert.equal(rejected.body.error, "INVALID_INPUT");
 });

@@ -7,7 +7,7 @@ test("health page contains action-first mobile controls and no fabricated nutrit
     fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
     fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
   ]);
-  for (const label of ["今日完成度", "水 +200 ml", "水 +500 ml", "水 +1000 ml", "茶 +200 ml", "茶 +500 ml", "茶 +1000 ml", "早餐拍照", "周报", "待 AI 分析"]) assert.ok(`${html}\n${client}`.includes(label));
+  for (const label of ["今日完成度", "水 +200 ml", "水 +500 ml", "水 +1000 ml", "茶 +200 ml", "茶 +500 ml", "茶 +1000 ml", "周报", "待 AI 分析"]) assert.ok(`${html}\n${client}`.includes(label));
   assert.match(client, /const API_ROOT = "\/api\/projects\/health\/health"/);
   assert.match(client, /Idempotency-Key/);
   assert.match(client, /canvas\.toBlob/);
@@ -63,7 +63,7 @@ test("today and plan views render the API schedule and expose all hydration size
   assert.match(html, /id="todaySchedule"/);
   assert.match(client, /data\.plan\.schedule/);
   assert.match(client, /renderTodaySchedule/);
-  assert.match(client, /hydration: "hydration"/);
+  assert.match(client, /data-today-target="hydration"/);
   for (const label of ["水 +1000 ml", "茶 +500 ml", "茶 +1000 ml", "计划提醒"]) assert.ok(page.includes(label));
   assert.doesNotMatch(page, /水 \+300 ml|茶 \+300 ml/);
 });
@@ -79,6 +79,24 @@ test("today schedule merges priority into action-style plan buttons", async () =
   assert.match(client, /scheduleButton/);
   assert.match(client, /class="action"/);
   assert.match(client, /disabled>.*计划提醒/);
+});
+
+test("today page makes meals, measurements, completion and fluid editing available in schedule actions", async () => {
+  const [html, client] = await Promise.all([
+    fs.readFile(new URL("../health.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../health-client.js", import.meta.url), "utf8")
+  ]);
+  assert.doesNotMatch(html, /id="mealCard"|id="measurementCard"/);
+  assert.match(html, /id="mealPhotoInput"[^>]*capture="environment"/);
+  assert.match(html, /id="measurementDialog"/);
+  assert.match(html, /data-fluid-slider="water"/);
+  assert.match(html, /data-fluid-slider="tea"/);
+  for (const label of ["水 +200 ml", "水 +500 ml", "水 +1000 ml", "茶 +200 ml", "茶 +500 ml", "茶 +1000 ml"]) assert.ok(html.includes(label));
+  assert.match(client, /data-meal-action/);
+  assert.match(client, /data-measurement-action/);
+  assert.match(client, /已完成 · 再点取消/);
+  assert.match(client, /\/events\/\$\{eventId\}\/undo/);
+  assert.match(client, /data-fluid-slider/);
 });
 
 test("health PWA exposes manifest, service worker and a static-only cache policy", async () => {

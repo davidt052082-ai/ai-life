@@ -10,7 +10,7 @@ const COMPARISON_METRICS = {
   waist: { name: "腰围记录", unit: "次" }
 };
 
-export function buildDailySummary({ date, timezone = "Asia/Shanghai", settings = {}, events = [], meals = [] }) {
+export function buildDailySummary({ date, timezone = "Asia/Shanghai", settings = {}, events = [], meals = [], measurements = [] }) {
   const hydration = events.filter((event) => event.eventType === "hydration").reduce((total, event) => {
     const volume = Number(event.payload?.volumeMl) || 0;
     if (event.payload?.type === "tea") total.teaMl += volume;
@@ -20,6 +20,9 @@ export function buildDailySummary({ date, timezone = "Asia/Shanghai", settings =
   hydration.totalMl = hydration.waterMl + hydration.teaMl;
   const completed = new Set(events.map((event) => event.eventType));
   const mealTypes = Object.fromEntries(meals.map((meal) => [meal.mealType, true]));
+  const actionEvents = Object.fromEntries(events
+    .filter((event) => ["lunch-walk", "dinner-walk", "training"].includes(event.payload?.taskId))
+    .map((event) => [event.payload.taskId, event.id]));
   const plan = getDailyPlan(date, timezone, settings);
   const remainingTasks = plan.tasks.filter((task) => {
     if (task.id.endsWith("-photo")) return !mealTypes[task.id.replace("-photo", "")];
@@ -30,6 +33,7 @@ export function buildDailySummary({ date, timezone = "Asia/Shanghai", settings =
   const completedCount = plan.tasks.length - remainingTasks.length;
   return {
     date, plan, meals: mealTypes, mealPhotoCount: meals.length, hydration, completedCount,
+    measurementRecorded: measurements.length > 0, actionEvents,
     completionPercent: Math.round(completedCount * 100 / plan.tasks.length), remainingTasks,
     highlightedTask: getHighlightedTask(new Date(), { meals: mealTypes, remainingTasks, plan }, timezone)
   };

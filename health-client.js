@@ -74,17 +74,38 @@ async function request(path, options = {}) {
   return data;
 }
 
-function scheduleButton(item) {
+function scheduleButton(item, data) {
   const label = `${item.time} · ${item.label}`;
-  const task = { walk: "post-meal-walk", training: "training" }[item.action];
-  if (task) return `<button class="action" type="button" data-task="${task}">${escapeHtml(label)}</button>`;
-  const target = { measurement: "measurement", meal: "meals", hydration: "hydration" }[item.action];
-  if (!target) return `<button class="action" type="button" disabled>${escapeHtml(label)} · 计划提醒</button>`;
-  return `<button class="action" type="button" data-today-target="${target}">${escapeHtml(label)}</button>`;
+  if (item.action === "meal") {
+    const mealType = item.id.replace("-photo", ""); const done = Boolean(data.meals[mealType]);
+    return `<button class="action${done ? " done" : ""}" type="button" data-meal-action="${mealType}">${escapeHtml(label)}${done ? " · 已完成" : ""}</button>`;
+  }
+  if (item.action === "measurement") {
+    const done = Boolean(data.measurementRecorded);
+    return `<button class="action${done ? " done" : ""}" type="button" data-measurement-action>${escapeHtml(label)}${done ? " · 已记录" : ""}</button>`;
+  }
+  if (item.action === "hydration") return `<button class="action" type="button" data-today-target="hydration">${escapeHtml(label)}</button>`;
+  const type = item.action === "training" ? (data.plan.training.type === "baduanjin" ? "baduanjin" : "workout") : item.action === "walk" ? "post_meal_walk" : null;
+  if (type) {
+    const eventId = data.actionEvents?.[item.id] || ""; const done = Boolean(eventId);
+    return `<button class="action${done ? " done" : ""}" type="button" data-checkin-type="${type}" data-task-id="${item.id}" data-event-id="${eventId}">${escapeHtml(label)}${done ? " · 已完成 · 再点取消" : ""}</button>`;
+  }
+  return `<button class="action" type="button" disabled>${escapeHtml(label)} · 计划提醒</button>`;
 }
 
 function renderTodaySchedule(data) {
-  $("#todaySchedule").innerHTML = data.plan.schedule.map(scheduleButton).join("");
+  $("#todaySchedule").innerHTML = data.plan.schedule.map((item) => scheduleButton(item, data)).join("");
+}
+
+function showFluidValue(type, value) {
+  $(`#${type === "tea" ? "teaMl" : "waterMl"}`).textContent = `${value} ml`;
+}
+
+function renderFluidEditor(data) {
+  for (const [type, value] of [["water", data.hydration.waterMl], ["tea", data.hydration.teaMl]]) {
+    const slider = $(`[data-fluid-slider="${type}"]`);
+    slider.max = String(Math.max(5000, value)); slider.value = String(value); showFluidValue(type, value);
+  }
 }
 
 function renderToday(data) {
@@ -95,8 +116,8 @@ function renderToday(data) {
   $("#remaining").textContent = data.remainingTasks.length ? `还差：${data.remainingTasks.map((item) => item.label).join("、")}` : "今天的计划都完成了。";
   $("#hydration").textContent = `${data.hydration.totalMl} / ${data.plan.hydrationTargetMl} ml`;
   $("#hydrationBar").style.width = `${Math.min(100, Math.round(data.hydration.totalMl * 100 / data.plan.hydrationTargetMl))}%`;
+  renderFluidEditor(data);
   $("#highlight").textContent = data.highlightedTask ? `此刻优先：${data.highlightedTask.label}` : "此刻优先：今天的重点事项已完成。";
-  $("#mealList").innerHTML = data.mealPhotoCount ? Object.keys(data.meals).map((type) => `<div class="item">${escapeHtml({ breakfast:"早餐", lunch:"午餐", dinner:"晚餐", snack:"加餐" }[type] || type)}：待 AI 分析</div>`).join("") : '<div class="muted">尚未上传餐食照片。</div>';
   const card = $("#notificationCard"); const notifications = data.notifications || [];
   card.hidden = notifications.length === 0;
   $("#notifications").innerHTML = notifications.map((item) => `<button class="item secondary" data-notification="${escapeHtml(item.id)}" type="button">${escapeHtml(item.message)}${item.readAt ? "（已读）" : ""}</button>`).join("");
@@ -150,6 +171,27 @@ async function submitAction(button, path, body, undoText) {
   try { const data = await request(path, { method: "POST", body: JSON.stringify(body) }); if (data?.queued) { showError("已离线保存，待联网同步。"); return; } await refreshToday(); await syncQueuedRequests(); if (data.event?.id) showUndo(data.event.id, undoText); }
   catch (error) { showError(errorMessage(error)); button.textContent = "记录失败，点击重试"; return; }
   finally { button.disabled = false; if (button.textContent === "提交中…") button.textContent = original; }
+}
+
+async function submitFluidDelta(type, slider) {
+  const property = type === "tea" ? "teaMl" : "waterMl";
+  const current = state.today.hydration[property]; const delta = Number(slider.value) - current;
+  if (!delta) return;
+  slider.disabled = true; showError();
+  try {
+    const data = await request("/hydration", { method: "POST", body: JSON.stringify({ type, volumeMl: delta }) });
+    if (data?.queued) {
+      state.today.hydration[property] += delta; state.today.hydration.totalMl += delta;
+      $("#hydration").textContent = `${state.today.hydration.totalMl} / ${state.today.plan.hydrationTargetMl} ml`;
+      $("#hydrationBar").style.width = `${Math.min(100, Math.round(state.today.hydration.totalMl * 100 / state.today.plan.hydrationTargetMl))}%`;
+      showError("已离线保存，待联网同步。");
+      return;
+    }
+    await refreshToday(); await syncQueuedRequests();
+    if (data.event?.id) showUndo(data.event.id, `已调整 ${delta > 0 ? "+" : ""}${delta} ml`);
+  } catch (error) {
+    slider.value = String(current); showFluidValue(type, current); showError(errorMessage(error));
+  } finally { slider.disabled = false; }
 }
 
 async function compressImage(file) {
@@ -228,14 +270,40 @@ async function loadTab(tab) {
 document.addEventListener("click", async (event) => {
   const planDate = event.target.closest("[data-plan-date]"); if (planDate) { try { await selectPlanDate(planDate.dataset.planDate); } catch (error) { showError(errorMessage(error)); } return; }
   const tab = event.target.closest("[data-tab]"); if (tab) { document.querySelectorAll(".tab").forEach((item) => item.setAttribute("aria-selected", String(item === tab))); document.querySelectorAll(".panel").forEach((item) => item.classList.toggle("active", item.id === tab.dataset.tab)); try { await loadTab(tab.dataset.tab); } catch (error) { showError(errorMessage(error)); } return; }
-  const todayTarget = event.target.closest("[data-today-target]"); if (todayTarget) { const selector = { measurement: "#measurementCard", meals: "#mealCard", hydration: "#hydrationCard" }[todayTarget.dataset.todayTarget]; document.querySelector(selector)?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  const mealAction = event.target.closest("[data-meal-action]"); if (mealAction) { const input = $("#mealPhotoInput"); input.dataset.meal = mealAction.dataset.mealAction; input.click(); return; }
+  const measurementAction = event.target.closest("[data-measurement-action]"); if (measurementAction) { const dialog = $("#measurementDialog"); if (typeof dialog.showModal === "function") dialog.showModal(); else showError("当前浏览器不支持身体记录窗口。"); return; }
+  const todayTarget = event.target.closest("[data-today-target]"); if (todayTarget) { $("#hydrationCard")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
   const hydration = event.target.closest("[data-hydration], [data-tea]"); if (hydration) { const volume = Number(hydration.dataset.hydration || hydration.dataset.tea); submitAction(hydration, "/hydration", { type: hydration.dataset.tea ? "tea" : "water", volumeMl: volume }, `已记录 +${volume} ml`); return; }
-  const task = event.target.closest("[data-task]"); if (task) { const type = task.dataset.task === "training" ? (state.today.plan.training.type === "baduanjin" ? "baduanjin" : "workout") : task.dataset.task.replaceAll("-", "_"); const sessionType = task.dataset.task === "training" && ["cardio", "strength"].includes(state.today.plan.training.type) ? state.today.plan.training.type : undefined; submitAction(task, "/checkins", { type, sessionType }, "已记录，点击撤销"); return; }
+  const task = event.target.closest("[data-checkin-type]"); if (task) {
+    const eventId = task.dataset.eventId;
+    if (eventId) {
+      task.disabled = true; showError();
+      try { await request(`/events/${eventId}/undo`, { method: "POST", body: "{}" }); await refreshToday(); }
+      catch (error) { showError(errorMessage(error)); }
+      finally { task.disabled = false; }
+      return;
+    }
+    const sessionType = task.dataset.taskId === "training" && ["cardio", "strength"].includes(state.today.plan.training.type) ? state.today.plan.training.type : undefined;
+    submitAction(task, "/checkins", { type: task.dataset.checkinType, sessionType, taskId: task.dataset.taskId }, "已记录，点击撤销"); return;
+  }
   const notice = event.target.closest("[data-notification]"); if (notice) { try { await request(`/notifications/${notice.dataset.notification}`, { method: "PATCH" }); await refreshToday(); } catch (error) { showError(errorMessage(error)); } }
 });
-document.addEventListener("change", (event) => { if (event.target.matches(".photo-input")) uploadMeal(event.target); });
+document.addEventListener("input", (event) => { const slider = event.target.closest("[data-fluid-slider]"); if (slider) showFluidValue(slider.dataset.fluidSlider, Number(slider.value)); });
+document.addEventListener("change", async (event) => {
+  if (event.target.matches("#mealPhotoInput")) { await uploadMeal(event.target); return; }
+  const slider = event.target.closest("[data-fluid-slider]"); if (slider) await submitFluidDelta(slider.dataset.fluidSlider, slider);
+});
 $("#undoButton").addEventListener("click", async () => { if (!state.undoEventId) return; try { await request(`/events/${state.undoEventId}/undo`, { method: "POST", body: "{}" }); $("#snackbar").classList.remove("show"); await refreshToday(); } catch (error) { showError(errorMessage(error)); } });
-$("#saveMeasurement").addEventListener("click", async (event) => submitAction(event.currentTarget, "/measurements", { weightKg: $("#weightKg").value || null, waistCm: $("#waistCm").value || null }, "身体记录已保存"));
+$("#cancelMeasurement").addEventListener("click", () => $("#measurementDialog").close());
+$("#measurementForm").addEventListener("submit", async (event) => {
+  event.preventDefault(); const button = $("#saveMeasurement"); button.disabled = true; showError();
+  try {
+    const data = await request("/measurements", { method: "POST", body: JSON.stringify({ weightKg: $("#weightKg").value || null, waistCm: $("#waistCm").value || null }) });
+    if (data?.queued) { showError("已离线保存，待联网同步。"); return; }
+    $("#measurementDialog").close(); await refreshToday(); await syncQueuedRequests();
+  } catch (error) { showError(errorMessage(error)); }
+  finally { button.disabled = false; }
+});
 $("#saveSettings").addEventListener("click", async () => { try { await request("/settings", { method: "PATCH", body: JSON.stringify({ hydrationTargetMl: Number($("#hydrationTarget").value), planDayCutoff: $("#cutoff").value, abdominalMassageEnabled: $("#massageEnabled").checked }) }); await refreshToday(); showError(); } catch (error) { showError(errorMessage(error)); } });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/health-sw.js", { scope: "/" }).catch(() => {});
 window.addEventListener("beforeinstallprompt", (event) => { event.preventDefault(); deferredInstallPrompt = event; $("#installHealthApp").hidden = false; });

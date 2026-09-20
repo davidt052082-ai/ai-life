@@ -24,3 +24,12 @@ test("replay keeps the first failed record and stops before later records", asyn
   assert.equal(await queue.replay("/api/projects/health/health"), 0);
   assert.equal(await queue.count(), 2);
 });
+
+test("offline queue preserves a negative hydration adjustment", async () => {
+  const sent = [];
+  const queue = createHealthOfflineQueue({ indexedDB: new IDBFactory(), fetchImpl: async (_url, init) => { sent.push(init); return new Response("{}", { status: 201 }); } });
+  await queue.enqueue({ path: "/hydration", method: "POST", headers: { "Idempotency-Key": "water-adjust", "Content-Type": "application/json" }, body: JSON.stringify({ type: "water", volumeMl: -100 }) });
+  assert.equal(await queue.replay("/api/projects/health/health"), 1);
+  assert.equal(await queue.count(), 0);
+  assert.equal(JSON.parse(sent[0].body).volumeMl, -100);
+});
