@@ -29,3 +29,28 @@ export function createTradeAnalysisPageHandler({ repository, sessionService, tar
     }
   };
 }
+
+export function createTradeAnalysisArtifactHandler({ repository, sessionService, filePath }) {
+  return async (req, res, next) => {
+    try {
+      const user = await sessionService?.getCurrentUser(req);
+      if (!user) {
+        res.redirect("/login?next=/projects/trade-analysis");
+        return;
+      }
+
+      const project = await repository?.findProjectAccess({
+        userId: user.id,
+        projectCode: TRADE_ANALYSIS_PROJECT_CODE
+      });
+      if (!project) {
+        res.redirect("/");
+        return;
+      }
+
+      res.sendFile(filePath);
+    } catch (error) {
+      next(error);
+    }
+  };
+}

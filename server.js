@@ -26,7 +26,10 @@ import { createWearableRouter } from "./src/routes/wearableRoutes.js";
 import { createStudyPlanRouter } from "./src/routes/studyPlanRoutes.js";
 import { createStudyPeopleRouter } from "./src/routes/studyPeopleRoutes.js";
 import { createHealthRouter } from "./src/routes/healthRoutes.js";
-import { createTradeAnalysisPageHandler } from "./src/routes/tradeAnalysisPage.js";
+import {
+  createTradeAnalysisArtifactHandler,
+  createTradeAnalysisPageHandler
+} from "./src/routes/tradeAnalysisPage.js";
 import { renderShareImagePng as defaultRenderShareImagePng } from "./src/shareImage.js";
 import { normalizeTradeAnalysisUrl } from "./src/trade-analysis/targetUrl.js";
 import { createSlidingWindowRateLimiter } from "./src/analytics/rateLimiter.js";
@@ -265,6 +268,11 @@ export function createApp(options = {}) {
     repository: userRepository,
     sessionService,
     targetUrl: tradeAnalysisUrl
+  }));
+  app.get("/trade-analysis.html", createTradeAnalysisArtifactHandler({
+    repository: userRepository,
+    sessionService,
+    filePath: options.tradeAnalysisFilePath || path.join(__dirname, "trade-analysis.html")
   }));
   app.get("/projects/health", async (req, res, next) => {
     try {

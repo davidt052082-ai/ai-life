@@ -1,14 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { fileURLToPath } from "node:url";
 import { createApp } from "../server.js";
 import { normalizeTradeAnalysisUrl } from "../src/trade-analysis/targetUrl.js";
 
-async function request(app, path) {
+const tradeAnalysisFilePath = fileURLToPath(new URL("../trade_analysis.html", import.meta.url));
+
+async function request(app, path, options = {}) {
   const server = app.listen(0, "127.0.0.1");
   await new Promise((resolve) => server.once("listening", resolve));
   try {
     const { port } = server.address();
-    return await fetch(`http://127.0.0.1:${port}${path}`, { redirect: "manual" });
+    return await fetch(`http://127.0.0.1:${port}${path}`, { redirect: "manual", ...options });
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
@@ -18,7 +21,8 @@ function createTradeApp({ user = { id: "user-1" }, project = { code: "trade-anal
   return createApp({
     userRepository: { findProjectAccess: async () => project },
     sessionService: { getCurrentUser: async () => user },
-    tradeAnalysisUrl
+    tradeAnalysisUrl,
+    tradeAnalysisFilePath
   });
 }
 
@@ -57,4 +61,26 @@ test("GET /projects/trade-analysis returns 503 when the dashboard URL is unavail
 
   assert.equal(response.status, 503);
   assert.match(await response.text(), /交易分析服务尚未配置/);
+});
+
+test("GET /trade-analysis.html sends unauthenticated users to login", async () => {
+  const response = await request(createTradeApp({ user: null }), "/trade-analysis.html");
+
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get("location"), "/login?next=/projects/trade-analysis");
+});
+
+test("GET /trade-analysis.html returns unauthorized users to the project directory", async () => {
+  const response = await request(createTradeApp({ project: null }), "/trade-analysis.html");
+
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.get("location"), "/");
+});
+
+test("HEAD /trade-analysis.html serves the dashboard metadata to an authorized user", async () => {
+  const response = await request(createTradeApp(), "/trade-analysis.html", { method: "HEAD" });
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /^text\/html/);
+  assert.equal(Number(response.headers.get("content-length")), 14_103_303);
 });
