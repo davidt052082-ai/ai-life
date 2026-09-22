@@ -10,6 +10,13 @@ export function inputError(message) {
   return error;
 }
 
+export function readWorkspaceInput(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) throw inputError("项目数据格式无效。");
+  if (typeof body.name !== "string" || !body.name.trim() || body.name.trim().length > 120) throw inputError("项目名称需为 1 到 120 个字符。");
+  if (body.description !== undefined && (typeof body.description !== "string" || body.description.length > 2000)) throw inputError("项目说明不能超过 2000 个字符。");
+  return { name: body.name.trim(), description: (body.description || "").trim() };
+}
+
 function readOptionalDate(value, message) {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value !== "string" || !ISO_DATE.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) throw inputError(message);

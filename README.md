@@ -92,6 +92,18 @@ pm2 save
 
 不要覆盖服务器上的 `/opt/ai-life/.env`，其中包含生产数据库和会话配置。
 
+## 事项管理：多个项目
+
+进入 `/projects/task-management` 后，使用顶部“新建项目”创建业务项目，在“当前项目”下拉框切换。项目名称必填，说明可选；新项目从空白开始，责任人可在“操作日志”前的“责任人”页面添加。
+
+业务项目归当前账号所有，并与 AI Life 项目目录中的应用授权分开。任务、责任人、依赖、冲突预警和操作日志全部按所选业务项目隔离。地址中的 `workspace` 参数保留当前选择，刷新后仍进入同一项目；切换时清空负责人筛选和未保存的编辑状态。
+
+升级时需先执行 `npm run db:migrate`，再重启服务并刷新页面。迁移 `013_task_management_workspaces.sql` 会将每个账号的旧任务、责任人、依赖与日志归入“默认项目”；没有历史数据的账号会看到创建首个项目的入口。迁移不会删除原有记录。
+
+项目列表与创建接口为 `/api/projects/task-management/task-management/workspaces`。具体数据接口位于 `/workspaces/:workspaceId/workspace`、`/people`、`/tasks`、`/dependencies` 和 `/logs` 下，禁止省略业务项目 ID 的旧式读写请求。
+
+多项目集成测试使用单独指定的临时 PostgreSQL 库：`TEST_TASK_DATABASE_URL=postgresql://... node --test test/task-management-workspaces.test.js`。测试在独立临时 schema 中验证迁移、账号授权、跨项目引用与日志隔离，结束后删除该测试 schema。未配置此环境变量时跳过数据库集成部分。
+
 ## 测试
 
 ```bash
