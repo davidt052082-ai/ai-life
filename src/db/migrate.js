@@ -13,6 +13,8 @@ export const TRADE_ANALYSIS_PROJECT_ID = "6cc66a0d-0ad2-4873-ac2c-e2e4a4bb6f1a";
 export const TRADE_ANALYSIS_PROJECT_CODE = "trade-analysis";
 export const HEALTH_PROJECT_ID = "8d82f809-4b39-4054-8718-3fec10c1f3cb";
 export const HEALTH_PROJECT_CODE = "health";
+export const TASK_MANAGEMENT_PROJECT_ID = "40c36068-6081-4a11-a1b2-7622b2058db5";
+export const TASK_MANAGEMENT_PROJECT_CODE = "task-management";
 
 export function validateDatabaseUrl(connectionString) {
   if (typeof connectionString !== "string" || !/^postgres(?:ql)?:\/\//i.test(connectionString)) {
@@ -74,6 +76,20 @@ async function seedHealthProject(client) {
   );
 }
 
+async function seedTaskManagementProject(client) {
+  await client.query(
+    `INSERT INTO projects (id, code, name, description, route, cover_image_url, sort_order)
+     VALUES ($1, $2, $3, $4, $5, NULL, $6)
+     ON CONFLICT (code) DO UPDATE SET
+       name = EXCLUDED.name,
+       description = EXCLUDED.description,
+       route = EXCLUDED.route,
+       cover_image_url = EXCLUDED.cover_image_url,
+       sort_order = EXCLUDED.sort_order`,
+    [TASK_MANAGEMENT_PROJECT_ID, TASK_MANAGEMENT_PROJECT_CODE, "事项管理", "统筹任务、排期、依赖、状态与冲突预警。", "/projects/task-management", 5]
+  );
+}
+
 export async function applyMigrations(pool, options = {}) {
   const migrationsDir = options.migrationsDir || defaultMigrationsDir;
   const client = await pool.connect();
@@ -99,6 +115,7 @@ export async function applyMigrations(pool, options = {}) {
 
     await seedWearableProject(client);
     await seedHealthProject(client);
+    await seedTaskManagementProject(client);
   } finally {
     client.release();
   }
