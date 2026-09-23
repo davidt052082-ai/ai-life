@@ -98,11 +98,29 @@ test("PostgreSQL migration and HTTP APIs isolate multiple task projects", {
     assert.equal((await request(b + "/workspace")).body.tasks.length, 0);
     assert.equal((await request(b + "/logs")).body.logs.length, 0);
   });
-  const personB = (await request(b + "/people", "POST", { name: "责任人 B", color: "#38BDF8", dailyCapacityHours: 8 })).body.person;
+  const personB = (await request(b + "/people", "POST", { name: "责任人 B", color: "#38BDF8", dailyCapacityHours: 4 })).body.person;
   const taskInput = { title: "事项 B", description: "", assigneeId: personB.id, startDate: "2026-09-21", endDate: "2026-09-21", estimatedHours: 12, actualHours: 0, status: "not_started", priority: "medium", isMilestone: false };
   const taskBResponse = await request(b + "/tasks", "POST", taskInput);
   assert.equal(taskBResponse.status, 201);
   const taskB = taskBResponse.body.task;
+  assert.equal(taskB.estimatedHours, 8, 'creation uses dates instead of client-supplied estimate');
+  await t.test('milestones share dependency APIs, calculated hours and workspace isolation', async () => {
+    const first = await request(b + '/tasks', 'POST', { ...taskInput, title: '里程碑一', assigneeId: null, isMilestone: true, endDate: '2026-09-23' });
+    const second = await request(b + '/tasks', 'POST', { ...taskInput, title: '里程碑二', assigneeId: null, isMilestone: true });
+    assert.equal(first.status, 201);
+    assert.equal(first.body.task.estimatedHours, 24);
+    assert.equal(first.body.task.isMilestone, true);
+    for (const [predecessorId, successorId] of [[taskB.id, first.body.task.id], [first.body.task.id, second.body.task.id], [second.body.task.id, taskB.id]]) {
+      assert.equal((await request(b + '/dependencies', 'POST', { predecessorId, successorId })).status, 201);
+    }
+    const workspace = (await request(b + '/workspace')).body;
+    assert.equal(workspace.dependencies.length, 3);
+    assert.ok(workspace.warnings.some((warning) => warning.kind === 'cycle'));
+    assert.equal((await request(a + '/dependencies', 'POST', { predecessorId: taskId, successorId: first.body.task.id })).status, 400);
+    for (const item of [first, second]) assert.equal((await request(b + '/tasks/' + item.body.task.id, 'DELETE')).status, 200);
+    assert.equal((await request(b + '/workspace')).body.dependencies.length, 0);
+    assert.equal((await request(b + '/tasks', 'POST', { ...taskInput, startDate: '2026-02-30' })).status, 400);
+  });
   await t.test("cross-project mutation and reference injection are rejected", async () => {
     assert.equal((await request(b + "/tasks/" + taskId, "PATCH", taskInput)).status, 404);
     assert.equal((await request(b + "/tasks/" + taskId, "DELETE")).status, 404);
@@ -137,4 +155,3 @@ test("PostgreSQL migration and HTTP APIs isolate multiple task projects", {
     assert.equal((await request(b + "/logs")).body.logs.length, count);
   });
 });
-

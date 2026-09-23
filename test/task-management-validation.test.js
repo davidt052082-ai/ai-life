@@ -21,6 +21,8 @@ test("task input permits an inverted date range for soft warnings", () => {
 
 test("task input rejects malformed dates and negative hours", () => {
   assert.throws(() => readTaskInput(validTask({ startDate: "20-06-01" })), /开始日期/);
+  assert.throws(() => readTaskInput(validTask({ startDate: "2026-02-29" })), /开始日期/);
+  assert.throws(() => readTaskInput(validTask({ endDate: "2026-04-31" })), /结束日期/);
   assert.throws(() => readTaskInput(validTask({ estimatedHours: -1 })), /预计工时/);
 });
 

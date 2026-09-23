@@ -330,6 +330,9 @@ export function createApp(options = {}) {
   app.get("/task-management-client.js", (_req, res) => {
     res.sendFile(path.join(__dirname, "task-management-client.js"));
   });
+  app.get("/task-management-scheduling.js", (_req, res) => {
+    res.sendFile(path.join(__dirname, "src", "task-management", "scheduling.js"));
+  });
   app.get("/health-offline.js", (_req, res) => {
     res.sendFile(path.join(__dirname, "health-offline.js"));
   });

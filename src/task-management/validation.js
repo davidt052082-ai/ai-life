@@ -1,6 +1,6 @@
+import { calendarDate } from "./scheduling.js";
 const STATUS_VALUES = new Set(["not_started", "in_progress", "completed", "blocked"]);
 const PRIORITY_VALUES = new Set(["high", "medium", "low"]);
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function inputError(message) {
@@ -19,7 +19,7 @@ export function readWorkspaceInput(body) {
 
 function readOptionalDate(value, message) {
   if (value === null || value === undefined || value === "") return null;
-  if (typeof value !== "string" || !ISO_DATE.test(value) || Number.isNaN(Date.parse(`${value}T00:00:00Z`))) throw inputError(message);
+  if (calendarDate(value) === null) throw inputError(message);
   return value;
 }
 

@@ -3,6 +3,7 @@ import { Router } from "express";
 import { requireProjectAccess, requireUser } from "../auth/middleware.js";
 import { inputError, readDependencyInput, readPersonInput, readTaskInput, readWorkspaceInput } from "../task-management/validation.js";
 import { calculateWarnings } from "../task-management/warnings.js";
+import { calculateEstimatedHours } from "../task-management/scheduling.js";
 
 function route(handler) {
   return async (req, res, next) => {
@@ -79,7 +80,7 @@ export function createTaskManagementRouter({ repository, projectRepository = rep
   }));
   scoped.get("/tasks", route(async (req, res) => res.json({ tasks: (await workspace(req)).tasks })));
   scoped.post("/tasks", route(async (req, res) => {
-    const task = readTaskInput(req.body);
+    const task = readTaskInput({ ...req.body, estimatedHours: calculateEstimatedHours(req.body?.startDate, req.body?.endDate) });
     if (task.assigneeId) await reference(req, "people", task.assigneeId);
     const created = await repository.createTask({ id: randomUUID(), ...context(req), task });
     res.status(201).json({ task: created, workspace: await workspace(req) });

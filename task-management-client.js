@@ -1,3 +1,5 @@
+import { calculateEstimatedHours, milestoneRelations } from "/task-management-scheduling.js";
+
 const API_ROOT = "/api/projects/task-management/task-management";
 const $ = (selector) => document.querySelector(selector);
 const emptyWorkspace = () => ({ people: [], tasks: [], dependencies: [], warnings: [] });
@@ -82,7 +84,50 @@ function command() {
       .map(([title, value]) => '<article class="panel">' + title + "<br><b>" + value + "</b></article>").join("") +
     "</div><h2>关注事项</h2>" + (tasks().map(card).join("") || '<p class="muted">当前项目暂无事项，点击“新建事项”开始。</p>');
 }
-function timeline() { content.innerHTML = "<h1>时间线</h1>" + (tasks().map(card).join("") || '<p class="muted">当前项目暂无事项</p>'); }
+function milestoneGraph() {
+  const graph = milestoneRelations(S.workspace.tasks, S.workspace.dependencies);
+  const milestones = graph.milestones.filter((task) => !S.filter || task.assigneeId === S.filter);
+  if (!milestones.length) return '<p class="muted">当前筛选下暂无里程碑，点击“新建里程碑”添加。</p>';
+  const positions = new Map(milestones.map((task, index) => [task.id, 30 + index * 270]));
+  const edges = graph.edges.filter((edge) => positions.has(edge.predecessorId) && positions.has(edge.successorId));
+  const byId = new Map(S.workspace.tasks.map((task) => [task.id, task]));
+  const y = 75 + Math.min(edges.length, 6) * 18;
+  const width = Math.max(320, milestones.length * 270 + 20);
+  const edgeLabel = (edge) => byId.get(edge.predecessorId).title + ' → ' + byId.get(edge.successorId).title +
+    (edge.indirect ? '（经事项：' + edge.viaTaskIds.map((id) => byId.get(id).title).join(' → ') + '）' : '（直接依赖）');
+  const lines = edges.map((edge, index) => {
+    const start = positions.get(edge.predecessorId) + 145;
+    const end = positions.get(edge.successorId) + 75;
+    const top = y - 40 - (index % 6) * 18;
+    return '<path class="milestone-edge' + (edge.indirect ? ' indirect' : '') + '" d="M ' + start + ' ' + y +
+      ' C ' + start + ' ' + top + ', ' + end + ' ' + top + ', ' + end + ' ' + (y - 4) +
+      '" marker-end="url(#milestone-arrow)"><title>' + esc(edgeLabel(edge)) + '</title></path>';
+  }).join('');
+  const nodes = milestones.map((task) => {
+    const x = positions.get(task.id);
+    const title = Array.from(task.title);
+    const shortTitle = title.length > 14 ? title.slice(0, 14).join('') + '…' : task.title;
+    return '<a href="#" data-edit-task="' + esc(task.id) + '" aria-label="编辑里程碑：' + esc(task.title) + '">' +
+      '<title>' + esc(task.title) + '</title><rect class="milestone-node' + (S.focus.has(task.id) ? ' milestone-focused' : '') +
+      '" x="' + x + '" y="' + y + '" width="220" height="94" rx="10"/>' +
+      '<text class="milestone-name" x="' + (x + 14) + '" y="' + (y + 26) + '">◆ ' + esc(shortTitle) + '</text>' +
+      '<text x="' + (x + 14) + '" y="' + (y + 51) + '">' + esc(task.startDate || '未排期') + ' → ' + esc(task.endDate || '未设置') + '</text>' +
+      '<text x="' + (x + 14) + '" y="' + (y + 75) + '">' + esc(statusLabels[task.status]) + '</text></a>';
+  }).join('');
+  return '<p class="muted">箭头由前置指向后置；实线为直接依赖，虚线为经事项连接。点击节点可编辑，横向滚动查看完整关系。</p>' +
+    '<div class="milestone-scroll" tabindex="0" role="region" aria-label="里程碑关系图，可横向滚动">' +
+    '<svg width="' + width + '" height="' + (y + 115) + '" role="group" aria-label="里程碑依赖关系">' +
+    '<defs><marker id="milestone-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#57e5f5"/></marker></defs>' +
+    lines + nodes + '</svg></div>' + (edges.length ? '<ul class="milestone-relations">' +
+      edges.map((edge) => '<li>' + esc(edgeLabel(edge)) + '</li>').join('') + '</ul>' :
+      '<p class="muted">暂无里程碑间的依赖关系。可前往“依赖网络”添加，不会按日期自动连线。</p>');
+}
+function timeline() {
+  content.innerHTML = '<h1>时间线</h1><section class="panel milestone-panel" aria-labelledby="milestone-heading">' +
+    '<div class="milestone-heading"><h2 id="milestone-heading">里程碑关系图</h2><button type="button" class="button primary" id="new-milestone">＋ 新建里程碑</button></div>' +
+    milestoneGraph() + '</section><h2>事项排期</h2>' + (tasks().slice().sort((a, b) =>
+      (a.startDate || '9999').localeCompare(b.startDate || '9999')).map(card).join('') || '<p class="muted">当前项目暂无事项</p>');
+}
 function list() { content.innerHTML = "<h1>任务清单</h1>" + (tasks().map(card).join("") || '<p class="muted">当前项目暂无事项</p>'); }
 function board() {
   content.innerHTML = '<h1>状态看板</h1><div class="people-grid">' + Object.entries(statusLabels).map(([status, label]) =>
@@ -90,14 +135,19 @@ function board() {
     tasks().filter((task) => task.status === status).map(card).join("") + "</section>").join("") + "</div>";
 }
 function network() {
-  const taskOptions = S.workspace.tasks.map((task) => '<option value="' + esc(task.id) + '">' + esc(task.title) + "</option>").join("");
+  const itemLabel = (task) => task ? (task.isMilestone ? '◆ 里程碑｜' : '事项｜') + task.title : '?';
+  const taskOptions = [true, false].map((isMilestone) => {
+    const group = S.workspace.tasks.filter((task) => task.isMilestone === isMilestone);
+    return group.length ? '<optgroup label="' + (isMilestone ? '里程碑' : '事项') + '">' + group.map((task) =>
+      '<option value="' + esc(task.id) + '">' + esc(itemLabel(task)) + '</option>').join('') + '</optgroup>' : '';
+  }).join('');
   content.innerHTML = '<h1>依赖网络</h1><form id="dependency-form" class="panel"><div class="twocol">' +
     '<label>前置<select name="predecessorId">' + taskOptions + '</select></label><label>后置<select name="successorId">' +
     taskOptions + '</select></label></div><button class="button primary"' + (taskOptions ? "" : " disabled") + ">添加依赖</button></form>" +
     S.workspace.dependencies.map((edge) => '<div class="panel ' +
       (S.focus.has(edge.predecessorId) || S.focus.has(edge.successorId) ? "focused" : "") + '">' +
-      esc(S.workspace.tasks.find((task) => task.id === edge.predecessorId)?.title || "?") + " → " +
-      esc(S.workspace.tasks.find((task) => task.id === edge.successorId)?.title || "?") +
+      esc(itemLabel(S.workspace.tasks.find((task) => task.id === edge.predecessorId))) + " → " +
+      esc(itemLabel(S.workspace.tasks.find((task) => task.id === edge.successorId))) +
       ' <button class="button" data-delete-dependency="' + esc(edge.id) + '">删除</button></div>').join("");
 }
 async function logs(version) {
@@ -201,17 +251,28 @@ async function save(path, method, body, dialog) {
     if (dialog?.open) lockControls(); else render();
   }
 }
-function openTask(id) {
+function updateEstimatedHours() {
+  if (S.taskId) return;
+  const { startDate, endDate, estimatedHours } = taskForm.elements;
+  estimatedHours.value = calculateEstimatedHours(startDate.value, endDate.value);
+  $("#estimated-hours-hint").textContent = !startDate.value || !endDate.value ? '填写开始和结束日期后自动计算（含首尾日期，每天 8 小时）。' :
+    endDate.value < startDate.value ? '结束日期早于开始日期，暂计 0 小时；保存后将显示日期冲突预警。' : '自动计算：（结束日期 − 开始日期 + 1）× 8 小时，包含周末。';
+}
+function openTask(id, asMilestone = false) {
   const task = S.workspace.tasks.find((item) => item.id === id);
   if (id && !task) return;
   S.taskId = id;
   taskForm.reset();
-  $("#task-title").textContent = id ? "编辑事项" : "新建事项";
+  $("#task-title").textContent = (id ? '编辑' : '新建') + ((task?.isMilestone || asMilestone) ? '里程碑' : '事项');
+  taskForm.elements.isMilestone.checked = asMilestone;
+  taskForm.elements.estimatedHours.readOnly = !id;
+  $("#estimated-hours-hint").textContent = id ? '已有事项保留原预计工时，可手动调整。' : '';
   if (task) for (const [key, value] of Object.entries(task)) {
     const field = taskForm.elements.namedItem(key);
     if (!field) continue;
     if (field.type === "checkbox") field.checked = value; else field.value = value ?? "";
   }
+  updateEstimatedHours();
   taskDialog.showModal();
 }
 function openPerson(id) {
@@ -247,9 +308,10 @@ document.addEventListener("click", (event) => {
     return;
   }
   if (target.closest("#new-task")) return openTask(null);
+  if (target.closest("#new-milestone")) return openTask(null, true);
   if (target.closest("#new-person")) return openPerson(null);
   const edit = target.closest("[data-edit-task]");
-  if (edit) return openTask(edit.dataset.editTask);
+  if (edit) { event.preventDefault(); return openTask(edit.dataset.editTask); }
   const personEdit = target.closest("[data-edit-person]");
   if (personEdit) return openPerson(personEdit.dataset.editPerson);
   const deletion = target.closest("[data-delete-task], [data-delete-person], [data-delete-dependency]");
@@ -265,8 +327,13 @@ $("#cancel").onclick = () => taskDialog.close();
 $("#person-cancel").onclick = () => personDialog.close();
 $("#project-cancel").onclick = () => projectDialog.close();
 for (const dialog of [projectDialog, taskDialog, personDialog]) dialog.addEventListener("cancel", (event) => { if (S.saving) event.preventDefault(); });
+for (const field of [taskForm.elements.startDate, taskForm.elements.endDate]) {
+  field.addEventListener('input', updateEstimatedHours);
+  field.addEventListener('change', updateEstimatedHours);
+}
 taskForm.onsubmit = (event) => {
   event.preventDefault();
+  updateEstimatedHours();
   const body = Object.fromEntries(new FormData(taskForm));
   Object.assign(body, { assigneeId: body.assigneeId || null, startDate: body.startDate || null, endDate: body.endDate || null,
     estimatedHours: Number(body.estimatedHours), actualHours: Number(body.actualHours), isMilestone: taskForm.elements.isMilestone.checked });

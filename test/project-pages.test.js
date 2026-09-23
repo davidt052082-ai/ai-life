@@ -35,4 +35,7 @@ test("study plan page and shared schedule module are registered", async () => {
   assert.ok(paths.includes("/projects/study-plan"));
   assert.ok(paths.includes("/study-plan/schedule.js"));
   assert.ok(paths.includes("/study-plan-client.js"));
+  assert.ok(paths.includes("/projects/task-management"));
+  assert.ok(paths.includes("/task-management-client.js"));
+  assert.ok(paths.includes("/task-management-scheduling.js"));
 });
