@@ -104,6 +104,30 @@ test("PostgreSQL migration and HTTP APIs isolate multiple task projects", {
   assert.equal(taskBResponse.status, 201);
   const taskB = taskBResponse.body.task;
   assert.equal(taskB.estimatedHours, 8, 'creation uses dates instead of client-supplied estimate');
+  await t.test('date edits recalculate estimates while unrelated edits preserve them', async () => {
+    const dateChanged = await request(b + '/tasks/' + taskB.id, 'PATCH', {
+      ...taskInput, endDate: '2026-09-23', estimatedHours: 999
+    });
+    assert.equal(dateChanged.status, 200);
+    assert.equal(dateChanged.body.task.estimatedHours, 24);
+
+    const unrelated = await request(b + '/tasks/' + taskB.id, 'PATCH', {
+      ...taskInput, endDate: '2026-09-23', estimatedHours: 777, status: 'in_progress'
+    });
+    assert.equal(unrelated.status, 200);
+    assert.equal(unrelated.body.task.estimatedHours, 24);
+
+    const reversed = await request(b + '/tasks/' + taskB.id, 'PATCH', {
+      ...taskInput, startDate: '2026-09-24', endDate: '2026-09-23', estimatedHours: 777
+    });
+    assert.equal(reversed.status, 200);
+    assert.equal(reversed.body.task.estimatedHours, 0);
+    assert.ok(reversed.body.workspace.warnings.some((warning) => warning.kind === 'task_date' && warning.taskIds.includes(taskB.id)));
+
+    const restored = await request(b + '/tasks/' + taskB.id, 'PATCH', taskInput);
+    assert.equal(restored.status, 200);
+    assert.equal(restored.body.task.estimatedHours, 8);
+  });
   await t.test('milestones share dependency APIs, calculated hours and workspace isolation', async () => {
     const first = await request(b + '/tasks', 'POST', { ...taskInput, title: '里程碑一', assigneeId: null, isMilestone: true, endDate: '2026-09-23' });
     const second = await request(b + '/tasks', 'POST', { ...taskInput, title: '里程碑二', assigneeId: null, isMilestone: true });

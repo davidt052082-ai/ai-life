@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calendarDate, calculateEstimatedHours, milestoneRelations } from '../src/task-management/scheduling.js';
+import {
+  applyAutomaticEstimate, calendarDate, calculateEstimatedHours,
+  milestoneConnectorPath, milestoneRelations
+} from '../src/task-management/scheduling.js';
 
 test('estimates include both dates, weekends, leap days and DST boundaries', () => {
   for (const [start, end, expected] of [
@@ -16,6 +19,29 @@ test('missing, reversed and impossible dates never produce negative or NaN hours
     assert.equal(calculateEstimatedHours('2026-09-22', value), 0);
   }
   assert.equal(calculateEstimatedHours('2026-09-23', '2026-09-22'), 0);
+});
+test('automatic estimate recalculates on create and date changes only', () => {
+  const previous = { startDate: '2026-09-22', endDate: '2026-09-24', estimatedHours: 12 };
+  assert.equal(applyAutomaticEstimate(null, { ...previous, estimatedHours: 999 }).estimatedHours, 24);
+  assert.equal(applyAutomaticEstimate(previous, { ...previous, endDate: '2026-09-25', estimatedHours: 999 }).estimatedHours, 32);
+  assert.equal(applyAutomaticEstimate(previous, { ...previous, startDate: '2026-09-21', estimatedHours: 999 }).estimatedHours, 32);
+  assert.equal(applyAutomaticEstimate(previous, { ...previous, estimatedHours: 999, status: 'completed' }).estimatedHours, 12);
+});
+test('automatic estimate returns zero for missing or reversed edited dates', () => {
+  const previous = { startDate: '2026-09-22', endDate: '2026-09-24', estimatedHours: 24 };
+  assert.equal(applyAutomaticEstimate(previous, { ...previous, endDate: null }).estimatedHours, 0);
+  assert.equal(applyAutomaticEstimate(previous, { ...previous, endDate: '2026-09-20' }).estimatedHours, 0);
+});
+test('milestone connectors are deterministic orthogonal paths', () => {
+  const upper = milestoneConnectorPath({ startX: 175, endX: 345, nodeY: 100, nodeHeight: 94, lane: 0 });
+  const lower = milestoneConnectorPath({ startX: 425, endX: 595, nodeY: 100, nodeHeight: 94, lane: 1 });
+  assert.equal(upper, 'M 175 100 L 175 72 L 345 72 L 345 96');
+  assert.equal(lower, 'M 425 194 L 425 222 L 595 222 L 595 198');
+  assert.doesNotMatch(upper + lower, /[CQSA]/);
+});
+test('self dependency uses an external rectangular loop', () => {
+  assert.equal(milestoneConnectorPath({ startX: 175, endX: 105, nodeY: 100, nodeHeight: 94, lane: 0 }),
+    'M 175 100 L 175 72 L 105 72 L 105 96');
 });
 const milestone = (id) => ({ id, title: id, isMilestone: true });
 const task = (id) => ({ id, title: id, isMilestone: false });

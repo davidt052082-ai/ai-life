@@ -2,6 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { calculateWarnings } from "../src/task-management/warnings.js";
 
+test("returns a soft task-date warning for an inverted range", () => {
+  const warnings = calculateWarnings({
+    tasks: [{ id: "t1", title: "倒置排期", startDate: "2026-09-24", endDate: "2026-09-23" }]
+  });
+  assert.equal(warnings.length, 1);
+  assert.equal(warnings[0].kind, "task_date");
+  assert.deepEqual(warnings[0].taskIds, ["t1"]);
+});
+
 test("returns a dependency date warning without blocking the task", () => {
   const warnings = calculateWarnings({ people: [], tasks: [
     { id: "a", title: "需求", startDate: "2026-06-01", endDate: "2026-06-10", estimatedHours: 0, assigneeId: null },

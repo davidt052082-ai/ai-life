@@ -44,6 +44,15 @@ function findCycles(tasks, dependencies) {
 
 export function calculateWarnings({ people = [], tasks = [], dependencies = [] }) {
   const warnings = [];
+  for (const task of tasks) {
+    if (task.startDate && task.endDate && task.endDate < task.startDate) {
+      warnings.push({
+        id: warningId("task_date", [task.id]), severity: "error", kind: "task_date",
+        taskIds: [task.id], dependencyIds: [], personId: null,
+        message: `“${task.title}”的结束日期早于开始日期。`
+      });
+    }
+  }
   const tasksById = new Map(tasks.map((task) => [task.id, task]));
   for (const dependency of dependencies) {
     const predecessor = tasksById.get(dependency.predecessorId);

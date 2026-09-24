@@ -12,6 +12,24 @@ export function calculateEstimatedHours(startDate, endDate) {
   return ((end - start) / 86400000 + 1) * 8;
 }
 
+export function applyAutomaticEstimate(previous, submitted) {
+  const datesChanged = !previous || previous.startDate !== submitted.startDate || previous.endDate !== submitted.endDate;
+  return {
+    ...submitted,
+    estimatedHours: datesChanged
+      ? calculateEstimatedHours(submitted.startDate, submitted.endDate)
+      : previous.estimatedHours
+  };
+}
+
+export function milestoneConnectorPath({ startX, endX, nodeY, nodeHeight, lane }) {
+  const below = lane % 2 === 1;
+  const startY = below ? nodeY + nodeHeight : nodeY;
+  const laneY = below ? startY + 28 + Math.floor(lane / 2) * 18 : startY - 28 - Math.floor(lane / 2) * 18;
+  const endY = below ? nodeY + nodeHeight + 4 : nodeY - 4;
+  return `M ${startX} ${startY} L ${startX} ${laneY} L ${endX} ${laneY} L ${endX} ${endY}`;
+}
+
 // Project the real dependency graph onto milestones. Stop at the next milestone;
 // ordinary tasks between two milestones are represented by a dashed connection.
 export function milestoneRelations(tasks, dependencies) {

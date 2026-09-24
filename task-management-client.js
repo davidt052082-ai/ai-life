@@ -1,11 +1,11 @@
-import { calculateEstimatedHours, milestoneRelations } from "/task-management-scheduling.js";
+import { calculateEstimatedHours, milestoneConnectorPath, milestoneRelations } from "/task-management-scheduling.js";
 
 const API_ROOT = "/api/projects/task-management/task-management";
 const $ = (selector) => document.querySelector(selector);
 const emptyWorkspace = () => ({ people: [], tasks: [], dependencies: [], warnings: [] });
 const S = {
   projects: [], workspaceId: "", workspace: emptyWorkspace(), view: "command",
-  filter: "", taskId: null, personId: null, focus: new Set(),
+  filter: "", taskId: null, taskBaseline: null, personId: null, focus: new Set(),
   loading: true, saving: false, loadVersion: 0, renderVersion: 0, failed: false
 };
 const content = $("#content");
@@ -91,16 +91,19 @@ function milestoneGraph() {
   const positions = new Map(milestones.map((task, index) => [task.id, 30 + index * 270]));
   const edges = graph.edges.filter((edge) => positions.has(edge.predecessorId) && positions.has(edge.successorId));
   const byId = new Map(S.workspace.tasks.map((task) => [task.id, task]));
-  const y = 75 + Math.min(edges.length, 6) * 18;
+  const upperLaneCount = Math.ceil(edges.length / 2);
+  const lowerLaneCount = Math.floor(edges.length / 2);
+  const y = 50 + Math.max(0, upperLaneCount - 1) * 18;
+  const lowerClearance = lowerLaneCount ? 28 + (lowerLaneCount - 1) * 18 : 0;
+  const svgHeight = y + 94 + lowerClearance + 24;
   const width = Math.max(320, milestones.length * 270 + 20);
   const edgeLabel = (edge) => byId.get(edge.predecessorId).title + ' → ' + byId.get(edge.successorId).title +
     (edge.indirect ? '（经事项：' + edge.viaTaskIds.map((id) => byId.get(id).title).join(' → ') + '）' : '（直接依赖）');
   const lines = edges.map((edge, index) => {
     const start = positions.get(edge.predecessorId) + 145;
     const end = positions.get(edge.successorId) + 75;
-    const top = y - 40 - (index % 6) * 18;
-    return '<path class="milestone-edge' + (edge.indirect ? ' indirect' : '') + '" d="M ' + start + ' ' + y +
-      ' C ' + start + ' ' + top + ', ' + end + ' ' + top + ', ' + end + ' ' + (y - 4) +
+    const path = milestoneConnectorPath({ startX: start, endX: end, nodeY: y, nodeHeight: 94, lane: index });
+    return '<path class="milestone-edge' + (edge.indirect ? ' indirect' : '') + '" d="' + path +
       '" marker-end="url(#milestone-arrow)"><title>' + esc(edgeLabel(edge)) + '</title></path>';
   }).join('');
   const nodes = milestones.map((task) => {
@@ -116,7 +119,7 @@ function milestoneGraph() {
   }).join('');
   return '<p class="muted">箭头由前置指向后置；实线为直接依赖，虚线为经事项连接。点击节点可编辑，横向滚动查看完整关系。</p>' +
     '<div class="milestone-scroll" tabindex="0" role="region" aria-label="里程碑关系图，可横向滚动">' +
-    '<svg width="' + width + '" height="' + (y + 115) + '" role="group" aria-label="里程碑依赖关系">' +
+    '<svg width="' + width + '" height="' + svgHeight + '" role="group" aria-label="里程碑依赖关系">' +
     '<defs><marker id="milestone-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#57e5f5"/></marker></defs>' +
     lines + nodes + '</svg></div>' + (edges.length ? '<ul class="milestone-relations">' +
       edges.map((edge) => '<li>' + esc(edgeLabel(edge)) + '</li>').join('') + '</ul>' :
@@ -196,6 +199,7 @@ async function switchProject(id) {
   S.filter = "";
   S.focus.clear();
   S.taskId = S.personId = null;
+  S.taskBaseline = null;
   [taskDialog, personDialog].forEach((dialog) => dialog.close());
   S.loading = Boolean(id);
   S.failed = false;
@@ -252,21 +256,29 @@ async function save(path, method, body, dialog) {
   }
 }
 function updateEstimatedHours() {
-  if (S.taskId) return;
   const { startDate, endDate, estimatedHours } = taskForm.elements;
-  estimatedHours.value = calculateEstimatedHours(startDate.value, endDate.value);
-  $("#estimated-hours-hint").textContent = !startDate.value || !endDate.value ? '填写开始和结束日期后自动计算（含首尾日期，每天 8 小时）。' :
-    endDate.value < startDate.value ? '结束日期早于开始日期，暂计 0 小时；保存后将显示日期冲突预警。' : '自动计算：（结束日期 − 开始日期 + 1）× 8 小时，包含周末。';
+  const unchanged = S.taskBaseline && S.taskBaseline.startDate === (startDate.value || null) &&
+    S.taskBaseline.endDate === (endDate.value || null);
+  estimatedHours.value = unchanged
+    ? S.taskBaseline.estimatedHours
+    : calculateEstimatedHours(startDate.value, endDate.value);
+  $("#estimated-hours-hint").textContent = !startDate.value || !endDate.value
+    ? '填写开始和结束日期后自动计算（含首尾日期，每天 8 小时）。'
+    : endDate.value < startDate.value
+      ? '结束日期早于开始日期，预计工时为 0；保存后显示日期冲突预警。'
+      : unchanged
+        ? '日期未变化，保留原预计工时。'
+        : '已按（结束日期 − 开始日期 + 1）× 8 小时重新计算，包含周末。';
 }
 function openTask(id, asMilestone = false) {
   const task = S.workspace.tasks.find((item) => item.id === id);
   if (id && !task) return;
   S.taskId = id;
+  S.taskBaseline = task ? { startDate: task.startDate, endDate: task.endDate, estimatedHours: task.estimatedHours } : null;
   taskForm.reset();
   $("#task-title").textContent = (id ? '编辑' : '新建') + ((task?.isMilestone || asMilestone) ? '里程碑' : '事项');
   taskForm.elements.isMilestone.checked = asMilestone;
-  taskForm.elements.estimatedHours.readOnly = !id;
-  $("#estimated-hours-hint").textContent = id ? '已有事项保留原预计工时，可手动调整。' : '';
+  taskForm.elements.estimatedHours.readOnly = true;
   if (task) for (const [key, value] of Object.entries(task)) {
     const field = taskForm.elements.namedItem(key);
     if (!field) continue;

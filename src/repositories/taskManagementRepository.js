@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { applyAutomaticEstimate } from "../task-management/scheduling.js";
 
 function dateValue(value) {
   if (!value) return null;
@@ -56,12 +57,17 @@ export function createTaskManagementRepository(pool) {
         await client.query("ROLLBACK");
         return null;
       }
+      const previous = beforeRow ? map(beforeRow) : null;
+      const submitted = input[type];
+      const entity = type === "task" && action !== "delete"
+        ? applyAutomaticEstimate(previous, submitted)
+        : submitted;
       let result;
       if (action === "delete") {
         result = await client.query("DELETE FROM " + table + " WHERE " + rowScope + " RETURNING *", values);
       } else {
         const entries = Object.entries(fields);
-        values.push(...entries.map(([key]) => input[type][key]));
+        values.push(...entries.map(([key]) => entity[key]));
         if (action === "create") {
           const columns = ["id", "user_id", "project_id", "workspace_id", ...entries.map(([, column]) => column)];
           result = await client.query("INSERT INTO " + table + " (" + columns.join(", ") + ") VALUES (" +
@@ -72,7 +78,7 @@ export function createTaskManagementRepository(pool) {
           result = await client.query("UPDATE " + table + " SET " + assignments.join(", ") + " WHERE " + rowScope + " RETURNING *", values);
         }
       }
-      const before = beforeRow ? map(beforeRow) : null;
+      const before = previous;
       const after = action === "delete" ? null : map(result.rows[0]);
       await client.query(
         "INSERT INTO task_audit_logs (id, user_id, project_id, workspace_id, entity_type, entity_id, action, before_state, after_state) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
