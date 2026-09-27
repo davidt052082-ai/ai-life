@@ -42,6 +42,12 @@ function weekStart(value) {
   return date.toISOString().slice(0, 10);
 }
 function addDays(date, amount) { const value = new Date(`${date}T12:00:00Z`); value.setUTCDate(value.getUTCDate() + amount); return value.toISOString().slice(0, 10); }
+function inPlanDateRange(items, startDate, endDate) {
+  return items.filter((item) => {
+    const date = String(item.planDate).slice(0, 10);
+    return date >= startDate && date <= endDate;
+  });
+}
 function sendRouteError(res, error) {
   if (error instanceof multer.MulterError) {
     res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({ error: "INVALID_IMAGE", message: error.code === "LIMIT_FILE_SIZE" ? "图片不能超过 2MB。" : "图片上传失败。" });
@@ -166,14 +172,17 @@ export function createHealthRouter({ repository, projectRepository = repository,
     const endDate = req.query.endDate ? toDate(req.query.endDate) : nowDate(settings.timezone);
     const startDate = req.query.startDate ? toDate(req.query.startDate) : addDays(endDate, -27);
     const fullRange = { ...scope(req), startDate: "1900-01-01", endDate: "2999-12-31" };
-    const [measurements, events, meals, allMeasurements, allEvents, allMeals] = await Promise.all([
-      repository.listMeasurements({ ...scope(req), startDate, endDate }),
-      repository.listEvents({ ...scope(req), startDate, endDate }),
-      repository.listMeals({ ...scope(req), startDate, endDate }),
+    const [allMeasurements, allEvents, allMeals] = await Promise.all([
       repository.listMeasurements({ ...scope(req) }),
       repository.listEvents(fullRange),
       repository.listMeals(fullRange)
     ]);
+    const events = inPlanDateRange(allEvents, startDate, endDate);
+    const meals = inPlanDateRange(allMeals, startDate, endDate);
+    const measurements = allMeasurements.filter((item) => {
+      const date = new Date(item.occurredAt).toISOString().slice(0, 10);
+      return date >= startDate && date <= endDate;
+    });
     res.set("Cache-Control", "no-store");
     res.json({ measurements: allMeasurements, history: { events: allEvents, meals: allMeals }, ...buildMetricTrends({ startDate, endDate, measurements, events, meals }) });
   }));

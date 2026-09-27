@@ -14,18 +14,22 @@ test("trends keep 28-day summary while returning all measurements", async () => 
     getSettings: async () => ({ timezone: "Asia/Shanghai" }),
     listMeasurements: async (query) => {
       calls.push(query);
-      return query.startDate ? [{ occurredAt: "2026-09-27T00:00:00Z", weightKg: 78, waistCm: 92 }] : [
+      return [
         { occurredAt: "2026-08-01T00:00:00Z", weightKg: 80, waistCm: 95 },
         { occurredAt: "2026-09-27T00:00:00Z", weightKg: 78, waistCm: 92 }
       ];
     },
     listEvents: async (query) => {
       eventCalls.push(query);
-      return query.startDate === "1900-01-01" ? [{ planDate: "2026-08-01", eventType: "hydration", payload: { type: "water", volumeMl: 200 } }] : [];
+      return query.startDate === "1900-01-01" ? [
+        { planDate: "2026-08-01", eventType: "hydration", payload: { type: "water", volumeMl: 200 } },
+        { planDate: "2026-09-27", eventType: "hydration", payload: { type: "water", volumeMl: 200 } },
+        { planDate: "2026-09-27", eventType: "post_meal_walk", payload: {} }
+      ] : [];
     },
     listMeals: async (query) => {
       mealCalls.push(query);
-      return query.startDate === "1900-01-01" ? [{ planDate: "2026-08-01", mealType: "breakfast" }] : [];
+      return query.startDate === "1900-01-01" ? [{ planDate: "2026-09-27", mealType: "breakfast" }] : [];
     }
   };
   const router = createHealthRouter({ repository, projectRepository: {}, sessionService: {}, healthProjectCode: "health", uploadDirectory: "/tmp/ai-life-health-test" });
@@ -34,13 +38,16 @@ test("trends keep 28-day summary while returning all measurements", async () => 
   await handler({ query: { endDate: "2026-09-27" }, user: { id: "u" }, project: { id: "p" } }, response);
   assert.equal(response.body.current.weight.value, 78);
   assert.equal(response.body.measurements.length, 2);
-  assert.ok(calls.some((query) => query.startDate === "2026-08-31"));
+  assert.equal(response.body.current.fluid.value, 200);
+  assert.equal(response.body.current.walks.value, 1);
+  assert.equal(response.body.current.mealPhotos.value, 1);
   assert.ok(calls.some((query) => query.startDate === undefined));
-  assert.deepEqual(response.body.history.events, [{ planDate: "2026-08-01", eventType: "hydration", payload: { type: "water", volumeMl: 200 } }]);
-  assert.deepEqual(response.body.history.meals, [{ planDate: "2026-08-01", mealType: "breakfast" }]);
+  assert.equal(response.body.history.events.length, 3);
+  assert.deepEqual(response.body.history.meals, [{ planDate: "2026-09-27", mealType: "breakfast" }]);
   assert.equal(response.headers["Cache-Control"], "no-store");
   assert.ok(eventCalls.some((query) => query.startDate === "1900-01-01" && query.endDate === "2999-12-31"));
   assert.ok(mealCalls.some((query) => query.startDate === "1900-01-01" && query.endDate === "2999-12-31"));
+  assert.ok(!eventCalls.some((query) => query.startDate === "2026-08-31"));
 });
 
 test("hydration route rejects invalid volume before persistence", async () => {
