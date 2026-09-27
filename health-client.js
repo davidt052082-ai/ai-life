@@ -252,11 +252,22 @@ const EXECUTION_DETAIL_METRICS = {
   noSugaryDrink: { label: "无含糖饮料天数", unit: "天", event: (item) => item.eventType === "no_sugary_drink", daily: true }
 };
 
+function validTrendDate(value) {
+  const date = String(value ?? "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const parsed = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) return null;
+  return date;
+}
+
 function executionPoints(history, metricId) {
   const config = EXECUTION_DETAIL_METRICS[metricId]; const byDate = new Map();
-  const add = (date, value, daily = false) => byDate.set(date, daily ? 1 : (byDate.get(date) || 0) + value);
-  if (config.meal) for (const meal of history?.meals || []) add(String(meal.planDate).slice(0, 10), 1);
-  else for (const event of history?.events || []) if (config.event(event)) add(String(event.planDate).slice(0, 10), config.value ? config.value(event) : 1, config.daily);
+  const add = (dateValue, value, daily = false) => {
+    const date = validTrendDate(dateValue); if (!date) return;
+    byDate.set(date, daily ? 1 : (byDate.get(date) || 0) + value);
+  };
+  if (config.meal) for (const meal of history?.meals || []) add(meal.planDate, 1);
+  else for (const event of history?.events || []) if (config.event(event)) add(event.planDate, config.value ? config.value(event) : 1, config.daily);
   return [...byDate].filter(([, value]) => value !== 0).sort(([left], [right]) => left.localeCompare(right)).map(([date, value]) => ({ date, value }));
 }
 

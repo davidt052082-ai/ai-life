@@ -72,6 +72,10 @@ test("trend page renders current metrics, real series, and explicit unavailable 
   assert.match(client, /当日 \$\{escapeHtml\(formatMetric/);
   assert.match(client, /累计 \$\{escapeHtml\(formatMetric/);
   assert.match(client, /近 28 日累计/);
+  assert.match(client, /function validTrendDate\(value\)/);
+  assert.match(client, /\/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$\//);
+  assert.match(client, /parsed\.toISOString\(\)\.slice\(0, 10\) !== date/);
+  assert.match(client, /const date = validTrendDate\(dateValue\); if \(!date\) return/);
 });
 
 test("today and plan views render the API schedule and expose all hydration sizes", async () => {
