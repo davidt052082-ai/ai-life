@@ -165,12 +165,17 @@ export function createHealthRouter({ repository, projectRepository = repository,
     const settings = await repository.getSettings(scope(req));
     const endDate = req.query.endDate ? toDate(req.query.endDate) : nowDate(settings.timezone);
     const startDate = req.query.startDate ? toDate(req.query.startDate) : addDays(endDate, -27);
-    const [measurements, events, meals] = await Promise.all([
+    const fullRange = { ...scope(req), startDate: "1900-01-01", endDate: "2999-12-31" };
+    const [measurements, events, meals, allMeasurements, allEvents, allMeals] = await Promise.all([
       repository.listMeasurements({ ...scope(req), startDate, endDate }),
       repository.listEvents({ ...scope(req), startDate, endDate }),
-      repository.listMeals({ ...scope(req), startDate, endDate })
+      repository.listMeals({ ...scope(req), startDate, endDate }),
+      repository.listMeasurements({ ...scope(req) }),
+      repository.listEvents(fullRange),
+      repository.listMeals(fullRange)
     ]);
-    res.json({ measurements, ...buildMetricTrends({ startDate, endDate, measurements, events, meals }) });
+    res.set("Cache-Control", "no-store");
+    res.json({ measurements: allMeasurements, history: { events: allEvents, meals: allMeals }, ...buildMetricTrends({ startDate, endDate, measurements, events, meals }) });
   }));
 
   async function weekly(req, res, includeOutcome) {

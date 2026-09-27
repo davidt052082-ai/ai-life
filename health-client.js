@@ -1,7 +1,7 @@
 import { createHealthOfflineQueue, isNetworkFailure } from "/health-offline.js";
 
 const API_ROOT = "/api/projects/health/health";
-const state = { today: null, planDate: null, undoEventId: null, undoTimer: null };
+const state = { today: null, planDate: null, undoEventId: null, undoTimer: null, trends: null, trendMetric: null, trendRange: "28" };
 const $ = (selector) => document.querySelector(selector);
 const OFFLINE_QUEUEABLE_PATHS = new Set(["/hydration", "/checkins", "/measurements", "/meals"]);
 let deferredInstallPrompt = null;
@@ -211,15 +211,83 @@ function buildTrendSvg(series) {
 }
 
 function trendDescription(metric, options = {}) {
-  if (metric.status === "empty") return "暂未采集";
+  if (metric.status === "empty") return options.emptyHint || "暂无记录";
+  if (metric.summary) return metric.summary;
   if (options.average7 !== undefined) return options.average7 === null ? "数据积累中" : `7 日平均 ${formatMetric(options.average7, metric.unit)}`;
   if (metric.change === null) return "数据积累中";
   return metric.change === 0 ? "与本周期起点持平" : `较本周期起点 ${metric.change > 0 ? "+" : ""}${formatMetric(metric.change, metric.unit)}`;
 }
 
 function metricCard(name, metric, options = {}) {
-  if (metric.status === "empty") return `<article class="metric-card"><div class="metric-name">${escapeHtml(name)}</div><p class="metric-empty">暂未采集<br>${escapeHtml(options.emptyHint || "记录后将在这里显示趋势。")}</p></article>`;
-  return `<article class="metric-card"><div class="metric-name">${escapeHtml(name)}</div><div class="metric-value">${formatMetric(metric.value, metric.unit)}</div><div class="metric-trend">${escapeHtml(trendDescription(metric, options))}</div>${buildTrendSvg(metric.series)}</article>`;
+  const empty = metric.status === "empty";
+  const content = empty ? `<div class="metric-name">${escapeHtml(name)}</div><div class="metric-value">0 ${escapeHtml(metric.unit)}</div><p class="metric-empty">${escapeHtml(trendDescription(metric, options))}</p>` : `<div class="metric-name">${escapeHtml(name)}</div><div class="metric-value">${formatMetric(metric.value, metric.unit)}</div><div class="metric-trend">${escapeHtml(trendDescription(metric, options))}</div>${buildTrendSvg(metric.series)}`;
+  if (options.detailMetric && (metric.status !== "empty" || metric.status === "empty")) return `<button class="metric-card metric-card-button" type="button" data-trend-metric="${options.detailMetric}" aria-label="查看${escapeHtml(name)}变化详情">${content}</button>`;
+  return `<article class="metric-card">${content}</article>`;
+}
+
+function measurementPoints(measurements, field) {
+  const byDate = new Map();
+  for (const item of measurements || []) {
+    const value = Number(item[field]);
+    if (!Number.isFinite(value)) continue;
+    const date = typeof item.occurredAt === "string" && /^\d{4}-\d{2}-\d{2}$/.test(item.occurredAt) ? item.occurredAt : new Date(item.occurredAt).toISOString().slice(0, 10);
+    byDate.set(date, value);
+  }
+  return [...byDate].sort(([left], [right]) => left.localeCompare(right)).map(([date, value]) => ({ date, value }));
+}
+
+function filterMeasurementPoints(points, range, endDate) {
+  return range === "28" ? points.filter((point) => point.date >= addDays(endDate, -27) && point.date <= endDate) : points;
+}
+
+const EXECUTION_DETAIL_METRICS = {
+  cardio: { label: "有氧训练", unit: "次", event: (item) => item.eventType === "workout" && item.payload?.sessionType === "cardio" },
+  strength: { label: "力量训练", unit: "次", event: (item) => item.eventType === "workout" && item.payload?.sessionType === "strength" },
+  walks: { label: "饭后步行", unit: "次", event: (item) => item.eventType === "post_meal_walk" },
+  fluid: { label: "总饮水量", unit: "ml", event: (item) => item.eventType === "hydration", value: (item) => Number(item.payload?.volumeMl) || 0 },
+  tea: { label: "无糖茶量", unit: "ml", event: (item) => item.eventType === "hydration" && item.payload?.type === "tea", value: (item) => Number(item.payload?.volumeMl) || 0 },
+  mealPhotos: { label: "餐食照片", unit: "餐", meal: true },
+  noAlcohol: { label: "无酒天数", unit: "天", event: (item) => item.eventType === "no_alcohol", daily: true },
+  noLateSnack: { label: "无夜宵天数", unit: "天", event: (item) => item.eventType === "no_late_snack", daily: true },
+  noSugaryDrink: { label: "无含糖饮料天数", unit: "天", event: (item) => item.eventType === "no_sugary_drink", daily: true }
+};
+
+function executionPoints(history, metricId) {
+  const config = EXECUTION_DETAIL_METRICS[metricId]; const byDate = new Map();
+  const add = (date, value, daily = false) => byDate.set(date, daily ? 1 : (byDate.get(date) || 0) + value);
+  if (config.meal) for (const meal of history?.meals || []) add(String(meal.planDate).slice(0, 10), 1);
+  else for (const event of history?.events || []) if (config.event(event)) add(String(event.planDate).slice(0, 10), config.value ? config.value(event) : 1, config.daily);
+  return [...byDate].filter(([, value]) => value !== 0).sort(([left], [right]) => left.localeCompare(right)).map(([date, value]) => ({ date, value }));
+}
+
+function cumulativePoints(points) { let total = 0; return points.map((point) => ({ ...point, cumulative: total += point.value, chartValue: total })); }
+
+function detailTrendSvg(label, range, points, unit) {
+  const rangeLabel = range === "28" ? "近 28 天" : "全部";
+  const values = points.map((point) => point.chartValue ?? point.value); const minimum = Math.min(...values); const maximum = Math.max(...values); const span = maximum - minimum || 1;
+  const x = (index) => 30 + (index * 270 / Math.max(1, points.length - 1));
+  const y = (value) => 155 - ((value - minimum) * 120 / span);
+  const path = points.length > 1 ? `<path d="${points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)},${y(point.chartValue ?? point.value).toFixed(1)}`).join(" ")}" fill="none" stroke="#2c8054" stroke-width="3" stroke-linecap="round" />` : "";
+  const dots = points.map((point, index) => `<circle cx="${x(index).toFixed(1)}" cy="${y(point.chartValue ?? point.value).toFixed(1)}" r="4" fill="#2c8054"><title>${escapeHtml(`${dateLabel(point.date)} · ${formatMetric(point.chartValue ?? point.value, unit)}`)}</title></circle>`).join("");
+  return `<svg class="trend-detail-chart" viewBox="0 0 320 190" role="img" aria-label="${escapeHtml(`${label}${rangeLabel}变化折线图`)}"><line x1="30" y1="155" x2="300" y2="155" stroke="#d7e6dc" /><line x1="30" y1="35" x2="30" y2="155" stroke="#d7e6dc" /><text x="4" y="39" fill="#617369" font-size="11">${escapeHtml(formatMetric(maximum, unit))}</text><text x="4" y="159" fill="#617369" font-size="11">${escapeHtml(formatMetric(minimum, unit))}</text>${path}${dots}<text x="30" y="178" fill="#617369" font-size="11">${escapeHtml(dateLabel(points[0].date))}</text><text x="300" y="178" text-anchor="end" fill="#617369" font-size="11">${escapeHtml(dateLabel(points.at(-1).date))}</text></svg>`;
+}
+
+function renderTrendDetail() {
+  const bodyConfig = { weight: { label: "体重", field: "weightKg", unit: "kg" }, waist: { label: "腰围", field: "waistCm", unit: "cm" } }[state.trendMetric];
+  const config = bodyConfig || EXECUTION_DETAIL_METRICS[state.trendMetric];
+  if (!config || !state.trends) return;
+  const { label, field, unit } = config; const range = state.trendRange; const execution = !bodyConfig;
+  const rawPoints = execution ? executionPoints(state.trends.history, state.trendMetric) : measurementPoints(state.trends.measurements, field);
+  const points = execution ? cumulativePoints(filterMeasurementPoints(rawPoints, range, state.trends.endDate)) : filterMeasurementPoints(rawPoints, range, state.trends.endDate);
+  $("#trendDetailTitle").textContent = `${label}变化`;
+  document.querySelectorAll("[data-trend-range]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.trendRange === range)));
+  if (!points.length) {
+    $("#trendDetailChart").innerHTML = `<p class="trend-detail-empty">暂无${label}记录</p>`;
+    $("#trendDetailPoints").innerHTML = "";
+    return;
+  }
+  $("#trendDetailChart").innerHTML = detailTrendSvg(label, range, points, unit);
+  $("#trendDetailPoints").innerHTML = points.map((point) => `<div class="item"><strong>${escapeHtml(dateLabel(point.date))}</strong> · ${execution ? `当日 ${escapeHtml(formatMetric(point.value, unit))} · 累计 ${escapeHtml(formatMetric(point.cumulative, unit))}` : escapeHtml(formatMetric(point.value, unit))}</div>`).join("");
 }
 
 function unavailableCard(name, hint, screening = false) {
@@ -231,15 +299,16 @@ function metricGroup(title, copy, cards) {
 }
 
 function renderMetricTrends(data) {
+  state.trends = data;
   const current = data.current;
   const core = metricGroup("核心结果", "身体结果以腰围和体重趋势为主。", [
-    metricCard("体重", current.weight, { average7: current.weight.average7, emptyHint: "每天起床、如厕后快速录入。" }),
-    metricCard("腰围", current.waist, { emptyHint: "建议每周用软尺记录一次。" })
+    metricCard("体重", current.weight, { average7: current.weight.average7, emptyHint: "每天起床、如厕后快速录入。", detailMetric: "weight" }),
+    metricCard("腰围", current.waist, { emptyHint: "建议每周用软尺记录一次。", detailMetric: "waist" })
   ]);
-  const execution = metricGroup("执行与行为", "近 7 天当前汇总；折线展示近 28 天每日记录。", [
-    metricCard("有氧训练", current.cardio), metricCard("力量训练", current.strength), metricCard("饭后步行", current.walks),
-    metricCard("总饮水量", current.fluid), metricCard("无糖茶量", current.tea), metricCard("餐食照片", current.mealPhotos),
-    metricCard("无酒天数", current.noAlcohol), metricCard("无夜宵天数", current.noLateSnack), metricCard("无含糖饮料天数", current.noSugaryDrink)
+  const execution = metricGroup("执行与行为", "近 28 日累计；折线展示近 28 天每日记录。", [
+    metricCard("有氧训练", current.cardio, { detailMetric: "cardio" }), metricCard("力量训练", current.strength, { detailMetric: "strength" }), metricCard("饭后步行", current.walks, { detailMetric: "walks" }),
+    metricCard("总饮水量", current.fluid, { detailMetric: "fluid" }), metricCard("无糖茶量", current.tea, { detailMetric: "tea" }), metricCard("餐食照片", current.mealPhotos, { detailMetric: "mealPhotos" }),
+    metricCard("无酒天数", current.noAlcohol, { detailMetric: "noAlcohol" }), metricCard("无夜宵天数", current.noLateSnack, { detailMetric: "noLateSnack" }), metricCard("无含糖饮料天数", current.noSugaryDrink, { detailMetric: "noSugaryDrink" })
   ]);
   const unavailable = metricGroup("待接入指标", "这些指标还没有当前数据源，系统不会以估算值替代。", [
     unavailableCard("步数", "待手环同步或手动周汇总。"), unavailableCard("睡眠时长", "待手环同步或手动录入。"),
@@ -258,7 +327,7 @@ async function loadTab(tab) {
   if (tab === "today") return refreshToday();
   if (tab === "plan") { if (!state.today) await refreshToday(); return selectPlanDate(state.planDate || state.today.date); }
   if (tab === "diet") { const data = await request("/meals"); $("#dietView").innerHTML = data.meals.length ? data.meals.map((meal) => `<div class="item">${escapeHtml(meal.mealType)} · 待 AI 分析</div>`).join("") : "暂无照片。"; }
-  if (tab === "trends") { renderMetricTrends(await request("/trends")); }
+  if (tab === "trends") { renderMetricTrends(await request("/trends", { cache: "no-store" })); }
   if (tab === "compare" || tab === "report") { const data = await request(tab === "compare" ? "/plan-vs-actual" : "/weekly-report"); const container = $(tab === "compare" ? "#compareView" : "#reportView"); container.innerHTML = `<p>本周执行分数：<strong>${data.executionScore}%</strong></p>${data.outcome ? `<p>4 周结果：${escapeHtml(data.outcome.label)}</p>` : ""}<table class="table"><thead><tr><th>项目</th><th>计划</th><th>实际</th><th>完成</th><th>偏差</th></tr></thead><tbody>${data.comparison.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${formatMetric(item.planned, item.unit)}</td><td>${formatMetric(item.actual, item.unit)}</td><td>${item.completionRate ?? "--"}%</td><td>${formatMetric(item.difference, item.unit)}</td></tr>`).join("")}</tbody></table>`; }
   if (tab === "settings") { const data = await request("/settings"); $("#hydrationTarget").value = data.settings.hydrationTargetMl; $("#cutoff").value = data.settings.planDayCutoff; $("#massageEnabled").checked = data.settings.abdominalMassageEnabled; }
 }
@@ -266,6 +335,8 @@ async function loadTab(tab) {
 document.addEventListener("click", async (event) => {
   const planDate = event.target.closest("[data-plan-date]"); if (planDate) { try { await selectPlanDate(planDate.dataset.planDate); } catch (error) { showError(errorMessage(error)); } return; }
   const tab = event.target.closest("[data-tab]"); if (tab) { document.querySelectorAll(".tab").forEach((item) => item.setAttribute("aria-selected", String(item === tab))); document.querySelectorAll(".panel").forEach((item) => item.classList.toggle("active", item.id === tab.dataset.tab)); try { await loadTab(tab.dataset.tab); } catch (error) { showError(errorMessage(error)); } return; }
+  const trendMetric = event.target.closest("[data-trend-metric]"); if (trendMetric) { state.trendMetric = trendMetric.dataset.trendMetric; state.trendRange = "28"; renderTrendDetail(); const dialog = $("#trendDetailDialog"); if (typeof dialog.showModal === "function") dialog.showModal(); else showError("当前浏览器不支持趋势详情窗口。"); return; }
+  const trendRange = event.target.closest("[data-trend-range]"); if (trendRange) { state.trendRange = trendRange.dataset.trendRange; renderTrendDetail(); return; }
   const mealAction = event.target.closest("[data-meal-action]"); if (mealAction) { const input = $("#mealPhotoInput"); input.dataset.meal = mealAction.dataset.mealAction; input.click(); return; }
   const measurementAction = event.target.closest("[data-measurement-action]"); if (measurementAction) { const dialog = $("#measurementDialog"); if (typeof dialog.showModal === "function") dialog.showModal(); else showError("当前浏览器不支持身体记录窗口。"); return; }
   const hydration = event.target.closest("[data-hydration], [data-tea]"); if (hydration) { const volume = Number(hydration.dataset.hydration || hydration.dataset.tea); submitAction(hydration, "/hydration", { type: hydration.dataset.tea ? "tea" : "water", volumeMl: volume }, `已记录 +${volume} ml`); return; }
@@ -290,6 +361,7 @@ document.addEventListener("change", async (event) => {
 });
 $("#undoButton").addEventListener("click", async () => { if (!state.undoEventId) return; try { await request(`/events/${state.undoEventId}/undo`, { method: "POST", body: "{}" }); $("#snackbar").classList.remove("show"); await refreshToday(); } catch (error) { showError(errorMessage(error)); } });
 $("#cancelMeasurement").addEventListener("click", () => $("#measurementDialog").close());
+$("#closeTrendDetail").addEventListener("click", () => $("#trendDetailDialog").close());
 $("#measurementForm").addEventListener("submit", async (event) => {
   event.preventDefault(); const button = $("#saveMeasurement"); button.disabled = true; showError();
   try {

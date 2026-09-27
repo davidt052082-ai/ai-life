@@ -8,6 +8,41 @@ test("health router exposes the agreed API endpoints", () => {
   assert.deepEqual(paths, ["get /today", "post /hydration", "post /checkins", "post /measurements", "post /events/:eventId/undo", "post /meals", "get /meals", "delete /meals/:id", "get /trends", "get /plan-vs-actual", "get /weekly-report", "get /settings", "patch /settings", "get /notifications", "patch /notifications/:id"]);
 });
 
+test("trends keep 28-day summary while returning all measurements", async () => {
+  const calls = []; const eventCalls = []; const mealCalls = [];
+  const repository = {
+    getSettings: async () => ({ timezone: "Asia/Shanghai" }),
+    listMeasurements: async (query) => {
+      calls.push(query);
+      return query.startDate ? [{ occurredAt: "2026-09-27T00:00:00Z", weightKg: 78, waistCm: 92 }] : [
+        { occurredAt: "2026-08-01T00:00:00Z", weightKg: 80, waistCm: 95 },
+        { occurredAt: "2026-09-27T00:00:00Z", weightKg: 78, waistCm: 92 }
+      ];
+    },
+    listEvents: async (query) => {
+      eventCalls.push(query);
+      return query.startDate === "1900-01-01" ? [{ planDate: "2026-08-01", eventType: "hydration", payload: { type: "water", volumeMl: 200 } }] : [];
+    },
+    listMeals: async (query) => {
+      mealCalls.push(query);
+      return query.startDate === "1900-01-01" ? [{ planDate: "2026-08-01", mealType: "breakfast" }] : [];
+    }
+  };
+  const router = createHealthRouter({ repository, projectRepository: {}, sessionService: {}, healthProjectCode: "health", uploadDirectory: "/tmp/ai-life-health-test" });
+  const handler = router.stack.find((layer) => layer.route?.path === "/trends").route.stack.at(-1).handle;
+  const response = { body: null, headers: {}, set(name, value) { this.headers[name] = value; return this; }, json(body) { this.body = body; } };
+  await handler({ query: { endDate: "2026-09-27" }, user: { id: "u" }, project: { id: "p" } }, response);
+  assert.equal(response.body.current.weight.value, 78);
+  assert.equal(response.body.measurements.length, 2);
+  assert.ok(calls.some((query) => query.startDate === "2026-08-31"));
+  assert.ok(calls.some((query) => query.startDate === undefined));
+  assert.deepEqual(response.body.history.events, [{ planDate: "2026-08-01", eventType: "hydration", payload: { type: "water", volumeMl: 200 } }]);
+  assert.deepEqual(response.body.history.meals, [{ planDate: "2026-08-01", mealType: "breakfast" }]);
+  assert.equal(response.headers["Cache-Control"], "no-store");
+  assert.ok(eventCalls.some((query) => query.startDate === "1900-01-01" && query.endDate === "2999-12-31"));
+  assert.ok(mealCalls.some((query) => query.startDate === "1900-01-01" && query.endDate === "2999-12-31"));
+});
+
 test("hydration route rejects invalid volume before persistence", async () => {
   let created = false;
   const router = createHealthRouter({ repository: { createEvent: async () => { created = true; } }, projectRepository: {}, sessionService: {}, healthProjectCode: "health", uploadDirectory: "/tmp/ai-life-health-test" });

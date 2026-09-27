@@ -45,17 +45,28 @@ test("metric trends aggregate daily events, meals, and body measurements", () =>
     startDate: "2026-09-01", endDate: "2026-09-07",
     measurements: [{ occurredAt: "2026-09-01T00:00:00Z", weightKg: 79, waistCm: 95 }, { occurredAt: "2026-09-07T00:00:00Z", weightKg: 78.2, waistCm: 94 }],
     events: [
+      { planDate: "2026-09-06", eventType: "hydration", payload: { type: "water", volumeMl: 300 } },
+      { planDate: "2026-09-06", eventType: "hydration", payload: { type: "tea", volumeMl: 200 } },
+      { planDate: "2026-09-06", eventType: "workout", payload: { sessionType: "cardio" } },
+      { planDate: "2026-09-06", eventType: "post_meal_walk", payload: { value: true } },
+      { planDate: "2026-09-06", eventType: "no_alcohol", payload: { value: true } },
       { planDate: "2026-09-07", eventType: "hydration", payload: { type: "water", volumeMl: 300 } },
       { planDate: "2026-09-07", eventType: "hydration", payload: { type: "tea", volumeMl: 200 } },
       { planDate: "2026-09-07", eventType: "workout", payload: { sessionType: "cardio" } },
       { planDate: "2026-09-07", eventType: "no_alcohol", payload: { value: true } }
     ],
-    meals: [{ planDate: "2026-09-07" }, { planDate: "2026-09-07" }]
+    meals: [{ planDate: "2026-09-06" }, { planDate: "2026-09-07" }, { planDate: "2026-09-07" }]
   });
   assert.equal(trends.daily.length, 7);
   assert.deepEqual(trends.daily.at(-1), { date: "2026-09-07", cardioSessions: 1, strengthSessions: 0, postMealWalks: 0, waterMl: 300, teaMl: 200, fluidMl: 500, mealPhotos: 2, noAlcohol: 1, noLateSnack: 0, noSugaryDrink: 0 });
   assert.equal(trends.current.weight.value, 78.2);
   assert.equal(trends.current.waist.value, 94);
-  assert.equal(trends.current.fluid.value, 500);
-  assert.equal(trends.current.mealPhotos.value, 2);
+  assert.equal(trends.current.cardio.value, 2);
+  assert.equal(trends.current.walks.value, 1);
+  assert.equal(trends.current.fluid.value, 1000);
+  assert.equal(trends.current.tea.value, 400);
+  assert.equal(trends.current.mealPhotos.value, 3);
+  assert.equal(trends.current.noAlcohol.value, 2);
+  assert.equal(trends.current.fluid.summary, "近 28 日累计");
+  assert.equal(trends.current.strength.status, "empty");
 });

@@ -52,6 +52,26 @@ test("trend page renders current metrics, real series, and explicit unavailable 
   assert.match(client, /buildTrendSvg/);
   assert.match(client, /暂未采集/);
   assert.match(client, /未录入体检数据/);
+  assert.match(html, /id="trendDetailDialog"/);
+  assert.match(html, /id="trendDetailTitle"/);
+  assert.match(html, /data-trend-range="28"/);
+  assert.match(html, /data-trend-range="all"/);
+  assert.match(client, /data-trend-metric/);
+  assert.match(client, /measurementPoints/);
+  assert.match(client, /new Date\(item\.occurredAt\)\.toISOString\(\)\.slice\(0, 10\)/);
+  assert.match(client, /filterMeasurementPoints/);
+  assert.match(client, /renderTrendDetail/);
+  assert.match(client, /state\.trends = data/);
+  assert.match(client, /range === "28"/);
+  assert.match(client, /metric\.status !== "empty"/);
+  assert.match(client, /暂无\$\{label\}记录/);
+  assert.match(client, /showModal/);
+  assert.match(client, /aria-pressed/);
+  for (const id of ["cardio", "strength", "walks", "fluid", "tea", "mealPhotos", "noAlcohol", "noLateSnack", "noSugaryDrink"]) assert.match(client, new RegExp(`detailMetric: "${id}"`));
+  assert.match(client, /cache: "no-store"/);
+  assert.match(client, /当日 \$\{escapeHtml\(formatMetric/);
+  assert.match(client, /累计 \$\{escapeHtml\(formatMetric/);
+  assert.match(client, /近 28 日累计/);
 });
 
 test("today and plan views render the API schedule and expose all hydration sizes", async () => {

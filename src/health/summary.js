@@ -78,7 +78,7 @@ function metric(value, unit, series, options = {}) {
     unit,
     series,
     change: latest !== null && first !== null && latest !== first ? Number((latest - first).toFixed(1)) : null,
-    status: resolved === null ? "empty" : "ready",
+    status: options.hasData === false ? "empty" : resolved === null ? "empty" : "ready",
     ...options
   };
 }
@@ -118,19 +118,21 @@ export function buildMetricTrends({ startDate, endDate, measurements = [], event
   const weightSeries = days.map((day) => weightByDate.get(day.date) ?? null);
   const waistSeries = days.map((day) => waistByDate.get(day.date) ?? null);
   const lastSevenWeights = weightSeries.slice(-7);
+  const total = (series) => series.reduce((sum, value) => sum + value, 0);
+  const executionMetric = (unit, series) => metric(total(series), unit, series, { summary: "近 28 日累计", hasData: series.some((value) => value !== 0) });
   const current = {
     weight: metric(latestValue(weightSeries), "kg", weightSeries, { average7: average(lastSevenWeights) }),
     waist: metric(latestValue(waistSeries), "cm", waistSeries),
-    cardio: metric(days.slice(-7).reduce((sum, day) => sum + day.cardioSessions, 0), "次", days.map((day) => day.cardioSessions)),
-    strength: metric(days.slice(-7).reduce((sum, day) => sum + day.strengthSessions, 0), "次", days.map((day) => day.strengthSessions)),
-    walks: metric(days.slice(-7).reduce((sum, day) => sum + day.postMealWalks, 0), "次", days.map((day) => day.postMealWalks)),
-    water: metric(latestValue(days.map((day) => day.waterMl)), "ml", days.map((day) => day.waterMl)),
-    tea: metric(latestValue(days.map((day) => day.teaMl)), "ml", days.map((day) => day.teaMl)),
-    fluid: metric(latestValue(days.map((day) => day.fluidMl)), "ml", days.map((day) => day.fluidMl)),
-    mealPhotos: metric(latestValue(days.map((day) => day.mealPhotos)), "餐", days.map((day) => day.mealPhotos)),
-    noAlcohol: metric(days.slice(-7).reduce((sum, day) => sum + day.noAlcohol, 0), "天", days.map((day) => day.noAlcohol)),
-    noLateSnack: metric(days.slice(-7).reduce((sum, day) => sum + day.noLateSnack, 0), "天", days.map((day) => day.noLateSnack)),
-    noSugaryDrink: metric(days.slice(-7).reduce((sum, day) => sum + day.noSugaryDrink, 0), "天", days.map((day) => day.noSugaryDrink))
+    cardio: executionMetric("次", days.map((day) => day.cardioSessions)),
+    strength: executionMetric("次", days.map((day) => day.strengthSessions)),
+    walks: executionMetric("次", days.map((day) => day.postMealWalks)),
+    water: executionMetric("ml", days.map((day) => day.waterMl)),
+    tea: executionMetric("ml", days.map((day) => day.teaMl)),
+    fluid: executionMetric("ml", days.map((day) => day.fluidMl)),
+    mealPhotos: executionMetric("餐", days.map((day) => day.mealPhotos)),
+    noAlcohol: executionMetric("天", days.map((day) => day.noAlcohol)),
+    noLateSnack: executionMetric("天", days.map((day) => day.noLateSnack)),
+    noSugaryDrink: executionMetric("天", days.map((day) => day.noSugaryDrink))
   };
   return { startDate, endDate, daily: days, current };
 }
