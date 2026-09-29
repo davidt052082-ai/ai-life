@@ -16,6 +16,28 @@ test("health page contains action-first mobile controls and no fabricated nutrit
   assert.doesNotMatch(client, /estimated_kcal|nutrition/);
 });
 
+test("Huawei legal pages are public and describe only the approved minimum data", async () => {
+  const [server, privacy, terms] = await Promise.all([
+    fs.readFile(new URL("../server.js", import.meta.url), "utf8"),
+    fs.readFile(new URL("../privacy.html", import.meta.url), "utf8"),
+    fs.readFile(new URL("../terms.html", import.meta.url), "utf8")
+  ]);
+  assert.match(server, /app\.get\("\/privacy\.html"/);
+  assert.match(server, /app\.get\("\/terms\.html"/);
+  for (const source of [privacy, terms]) {
+    assert.match(source, /华为运动健康/);
+    assert.match(source, /ai-life\.top/);
+    assert.match(source, /philcage@126\.com/);
+  }
+  assert.match(privacy, /步数/);
+  assert.match(privacy, /活动消耗/);
+  assert.match(privacy, /运动时长/);
+  assert.match(privacy, /最多回溯 30 天/);
+  assert.match(privacy, /断开连接/);
+  assert.match(privacy, /删除其健康同步数据/);
+  assert.doesNotMatch(privacy, /睡眠数据|深睡|静息心率|HRV/);
+});
+
 test("server wires health project API and protected page", async () => {
   const source = await fs.readFile(new URL("../server.js", import.meta.url), "utf8");
   assert.match(source, /createHealthRepository/);
@@ -70,8 +92,11 @@ test("trend page renders current metrics, real series, and explicit unavailable 
   for (const id of ["cardio", "strength", "walks", "fluid", "tea", "mealPhotos", "noAlcohol", "noLateSnack", "noSugaryDrink"]) assert.match(client, new RegExp(`detailMetric: "${id}"`));
   assert.match(client, /cache: "no-store"/);
   assert.match(client, /当日 \$\{escapeHtml\(formatMetric/);
-  assert.match(client, /累计 \$\{escapeHtml\(formatMetric/);
   assert.match(client, /近 28 日累计/);
+  assert.match(client, /const points = filterMeasurementPoints\(rawPoints, range, state\.trends\.endDate\);/);
+  assert.match(client, /当日 \$\{escapeHtml\(formatMetric\(point\.value, unit\)\)\}/);
+  assert.doesNotMatch(client, /function cumulativePoints/);
+  assert.doesNotMatch(client, /累计 \$\{escapeHtml\(formatMetric\(point\.cumulative, unit\)\)\}/);
   assert.match(client, /function validTrendDate\(value\)/);
   assert.match(client, /\/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$\//);
   assert.match(client, /parsed\.toISOString\(\)\.slice\(0, 10\) !== date/);
@@ -146,7 +171,7 @@ test("health PWA exposes manifest, service worker and a static-only cache policy
     fs.readFile(new URL("../server.js", import.meta.url), "utf8")
   ]);
   assert.equal(JSON.parse(manifest).display, "standalone");
-  assert.match(worker, /CACHE_NAME = "ai-life-health-shell-v1"/);
+  assert.match(worker, /CACHE_NAME = "ai-life-health-shell-v3"/);
   assert.match(worker, /"\/projects\/health"/);
   assert.doesNotMatch(worker, /\/api\/projects\/health\/health/);
   for (const path of ["/health-manifest.webmanifest", "/health-icon.svg", "/health-sw.js", "/health-offline.js"]) assert.ok(server.includes(path));

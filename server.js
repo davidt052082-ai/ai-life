@@ -16,6 +16,7 @@ import { createWearableRepository } from "./src/repositories/wearableRepository.
 import { createStudyPlanRepository } from "./src/repositories/studyPlanRepository.js";
 import { createStudyPeopleRepository } from "./src/repositories/studyPeopleRepository.js";
 import { createHealthRepository } from "./src/repositories/healthRepository.js";
+import { createHuaweiHealthRepository } from "./src/repositories/huaweiHealthRepository.js";
 import { createTaskManagementRepository } from "./src/repositories/taskManagementRepository.js";
 import { createAnalyticsRepository } from "./src/repositories/analyticsRepository.js";
 import { createAuthRouter } from "./src/routes/authRoutes.js";
@@ -27,6 +28,12 @@ import { createWearableRouter } from "./src/routes/wearableRoutes.js";
 import { createStudyPlanRouter } from "./src/routes/studyPlanRoutes.js";
 import { createStudyPeopleRouter } from "./src/routes/studyPeopleRoutes.js";
 import { createHealthRouter } from "./src/routes/healthRoutes.js";
+import { createHuaweiHealthCallbackRouter } from "./src/routes/huaweiHealthRoutes.js";
+import { readHuaweiConfig } from "./src/integrations/huawei-health/config.js";
+import { createHuaweiHealthClient } from "./src/integrations/huawei-health/client.js";
+import { createHuaweiSyncService } from "./src/integrations/huawei-health/sync-service.js";
+import { createHuaweiHealthService } from "./src/integrations/huawei-health/service.js";
+import { startHuaweiScheduler } from "./src/integrations/huawei-health/scheduler.js";
 import { createTaskManagementRouter } from "./src/routes/taskManagementRoutes.js";
 import {
   createTradeAnalysisArtifactHandler,
@@ -56,6 +63,11 @@ export function createApp(options = {}) {
   const studyPlanRepository = options.studyPlanRepository || (pool ? createStudyPlanRepository(pool) : null);
   const studyPeopleRepository = options.studyPeopleRepository || (pool ? createStudyPeopleRepository(pool) : null);
   const healthRepository = options.healthRepository || (pool ? createHealthRepository(pool) : null);
+  const huaweiConfig = options.huaweiConfig || readHuaweiConfig(options.env || process.env);
+  const huaweiRepository = options.huaweiRepository || (pool ? createHuaweiHealthRepository(pool) : null);
+  const huaweiClient = huaweiConfig.enabled ? (options.huaweiClient || createHuaweiHealthClient({ config: huaweiConfig })) : null;
+  const huaweiSyncService = huaweiConfig.enabled && huaweiRepository ? (options.huaweiSyncService || createHuaweiSyncService({ repository: huaweiRepository, client: huaweiClient, config: huaweiConfig })) : null;
+  const huaweiService = createHuaweiHealthService({ config: huaweiConfig, repository: huaweiRepository, syncService: huaweiSyncService || { syncUser: async () => ({ status: "skipped" }) } });
   const taskManagementRepository = options.taskManagementRepository || (pool ? createTaskManagementRepository(pool) : null);
   const healthUploadDirectory = options.healthUploadDirectory || path.join(__dirname, "uploads", "health");
   const analyticsRepository = options.analyticsRepository || (pool ? createAnalyticsRepository(pool) : null);
@@ -111,6 +123,7 @@ export function createApp(options = {}) {
       adminEmail,
       analytics
     }));
+    app.use("/api/integrations/huawei", createHuaweiHealthCallbackRouter({ sessionService, huaweiService }));
     app.use("/api/projects", createProjectRouter({ repository: userRepository, sessionService }));
     if (analyticsRepository) {
       app.use("/api/admin/analytics", createAdminAnalyticsRouter({ repository: analyticsRepository, sessionService, adminEmail }));
@@ -142,7 +155,9 @@ export function createApp(options = {}) {
       projectRepository: userRepository,
       sessionService,
       healthProjectCode: HEALTH_PROJECT_CODE,
-      uploadDirectory: healthUploadDirectory
+      uploadDirectory: healthUploadDirectory,
+      huaweiService,
+      huaweiRepository
     }));
     app.use("/api/projects/:code/task-management", createTaskManagementRouter({
       repository: taskManagementRepository,
@@ -286,6 +301,15 @@ export function createApp(options = {}) {
     sessionService,
     filePath: options.tradeAnalysisFilePath || path.join(__dirname, "trade-analysis.html")
   }));
+  app.get("/privacy.html", (_req, res) => {
+    res.sendFile(path.join(__dirname, "privacy.html"));
+  });
+  app.get("/terms.html", (_req, res) => {
+    res.sendFile(path.join(__dirname, "terms.html"));
+  });
+  app.get("/legal.css", (_req, res) => {
+    res.sendFile(path.join(__dirname, "legal.css"));
+  });
   app.get("/projects/health", async (req, res, next) => {
     try {
       const user = await sessionService?.getCurrentUser(req);
@@ -358,6 +382,12 @@ export function createApp(options = {}) {
     if (!stopAnalyticsMaintenance) stopAnalyticsMaintenance = startAnalyticsMaintenance(analyticsRepository);
     return stopAnalyticsMaintenance;
   };
+  let huaweiScheduler = null;
+  app.locals.startHuaweiScheduler = () => {
+    if (!huaweiConfig.enabled || !huaweiRepository || !huaweiSyncService) return () => {};
+    if (!huaweiScheduler) huaweiScheduler = startHuaweiScheduler({ repository: huaweiRepository, syncService: huaweiSyncService, intervalHours: huaweiConfig.intervalHours });
+    return huaweiScheduler.stop;
+  };
 
   return app;
 }
@@ -371,11 +401,13 @@ if (process.argv[1] === __filename) {
     console.error("Unable to synchronize configured administrator:", error);
   }
   const stopMaintenance = app.locals.startAnalyticsMaintenance();
+  const stopHuaweiScheduler = app.locals.startHuaweiScheduler();
   const server = app.listen(port, () => {
     console.log(`AI Life wearable collector running at http://localhost:${port}`);
   });
   const stop = () => server.close(() => {
     stopMaintenance();
+    stopHuaweiScheduler();
     process.exit(0);
   });
   process.once("SIGINT", stop);
