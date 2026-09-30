@@ -46,6 +46,7 @@ test("listMigrationFiles returns SQL files in lexical order", async () => {
     "010_trade_analysis_project.sql",
     "011_health_management.sql",
     "012_task_management.sql",
-    "013_task_management_workspaces.sql"
+    "013_task_management_workspaces.sql",
+    "014_huawei_health.sql"
   ]);
 });

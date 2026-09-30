@@ -70,3 +70,20 @@ test("metric trends aggregate daily events, meals, and body measurements", () =>
   assert.equal(trends.current.fluid.summary, "近 28 日累计");
   assert.equal(trends.current.strength.status, "empty");
 });
+
+test("manual weight wins while Huawei steps remain visible", () => {
+  const trends = buildMetricTrends({
+    startDate: "2026-09-28", endDate: "2026-09-28",
+    measurements: [{ occurredAt: "2026-09-28T01:00:00Z", weightKg: 78 }], events: [], meals: [],
+    huaweiDaily: [{ localDate: "2026-09-28", weightKg: 79, steps: 8624, activeCaloriesKcal: 516, exerciseMinutes: 47, sleepMinutes: 432, restingHr: 62 }]
+  });
+  assert.equal(trends.current.weight.value, 78);
+  assert.equal(trends.current.steps.value, 8624);
+  assert.equal(trends.current.steps.source, "huawei");
+});
+
+test("the latest available weight identifies its actual source", () => {
+  const trends = buildMetricTrends({ startDate: "2026-09-28", endDate: "2026-09-29", measurements: [{ occurredAt: "2026-09-28T01:00:00Z", weightKg: 78 }], events: [], meals: [], huaweiDaily: [{ localDate: "2026-09-29", weightKg: 77.8 }] });
+  assert.equal(trends.current.weight.value, 77.8);
+  assert.equal(trends.current.weight.source, "huawei");
+});

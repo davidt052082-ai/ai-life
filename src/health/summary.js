@@ -83,7 +83,7 @@ function metric(value, unit, series, options = {}) {
   };
 }
 
-export function buildMetricTrends({ startDate, endDate, measurements = [], events = [], meals = [] }) {
+export function buildMetricTrends({ startDate, endDate, measurements = [], events = [], meals = [], huaweiDaily = [] }) {
   const days = [];
   for (let date = startDate; date <= endDate; date = addDays(date, 1)) {
     days.push({ date, cardioSessions: 0, strengthSessions: 0, postMealWalks: 0, waterMl: 0, teaMl: 0, fluidMl: 0, mealPhotos: 0, noAlcohol: 0, noLateSnack: 0, noSugaryDrink: 0 });
@@ -109,19 +109,29 @@ export function buildMetricTrends({ startDate, endDate, measurements = [], event
     const day = byDate.get(dateFromValue(meal.planDate));
     if (day) day.mealPhotos += 1;
   }
+  for (const item of huaweiDaily) {
+    const day = byDate.get(dateFromValue(item.localDate));
+    if (!day) continue;
+    for (const field of ["steps", "activeCaloriesKcal", "exerciseMinutes", "sleepMinutes", "deepSleepMinutes", "restingHr"]) {
+      if (item[field] !== null && item[field] !== undefined) day[field] = Number(item[field]);
+    }
+    if (item.weightKg !== null && item.weightKg !== undefined) day.huaweiWeightKg = Number(item.weightKg);
+  }
   const weightByDate = new Map(); const waistByDate = new Map();
   for (const item of measurements) {
     const date = dateFromValue(item.occurredAt);
     if (item.weightKg !== null && item.weightKg !== undefined) weightByDate.set(date, Number(item.weightKg));
     if (item.waistCm !== null && item.waistCm !== undefined) waistByDate.set(date, Number(item.waistCm));
   }
-  const weightSeries = days.map((day) => weightByDate.get(day.date) ?? null);
+  const weightSeries = days.map((day) => weightByDate.get(day.date) ?? day.huaweiWeightKg ?? null);
   const waistSeries = days.map((day) => waistByDate.get(day.date) ?? null);
+  const latestWeightDay = [...days].reverse().find((day) => weightByDate.has(day.date) || day.huaweiWeightKg !== undefined);
   const lastSevenWeights = weightSeries.slice(-7);
   const total = (series) => series.reduce((sum, value) => sum + value, 0);
   const executionMetric = (unit, series) => metric(total(series), unit, series, { summary: "近 28 日累计", hasData: series.some((value) => value !== 0) });
+  const huaweiMetric = (unit, series) => metric(latestValue(series), unit, series, { source: "huawei", summary: "华为运动健康", hasData: series.some((value) => value !== null) });
   const current = {
-    weight: metric(latestValue(weightSeries), "kg", weightSeries, { average7: average(lastSevenWeights) }),
+    weight: metric(latestValue(weightSeries), "kg", weightSeries, { average7: average(lastSevenWeights), source: latestWeightDay ? weightByDate.has(latestWeightDay.date) ? "manual" : "huawei" : null }),
     waist: metric(latestValue(waistSeries), "cm", waistSeries),
     cardio: executionMetric("次", days.map((day) => day.cardioSessions)),
     strength: executionMetric("次", days.map((day) => day.strengthSessions)),
@@ -132,7 +142,13 @@ export function buildMetricTrends({ startDate, endDate, measurements = [], event
     mealPhotos: executionMetric("餐", days.map((day) => day.mealPhotos)),
     noAlcohol: executionMetric("天", days.map((day) => day.noAlcohol)),
     noLateSnack: executionMetric("天", days.map((day) => day.noLateSnack)),
-    noSugaryDrink: executionMetric("天", days.map((day) => day.noSugaryDrink))
+    noSugaryDrink: executionMetric("天", days.map((day) => day.noSugaryDrink)),
+    steps: huaweiMetric("步", days.map((day) => day.steps ?? null)),
+    activeCalories: huaweiMetric("kcal", days.map((day) => day.activeCaloriesKcal ?? null)),
+    exerciseMinutes: huaweiMetric("分钟", days.map((day) => day.exerciseMinutes ?? null)),
+    sleep: huaweiMetric("分钟", days.map((day) => day.sleepMinutes ?? null)),
+    deepSleep: huaweiMetric("分钟", days.map((day) => day.deepSleepMinutes ?? null)),
+    restingHr: huaweiMetric("bpm", days.map((day) => day.restingHr ?? null))
   };
   return { startDate, endDate, daily: days, current };
 }

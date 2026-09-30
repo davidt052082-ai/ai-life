@@ -1,4 +1,4 @@
-const CACHE_NAME = "ai-life-health-shell-v1";
+const CACHE_NAME = "ai-life-health-shell-v3";
 const SHELL = ["/projects/health", "/health-client.js", "/health-offline.js", "/health-manifest.webmanifest", "/health-icon.svg"];
 
 self.addEventListener("install", (event) => {

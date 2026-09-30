@@ -5,7 +5,7 @@ import { createHealthRouter } from "../src/routes/healthRoutes.js";
 test("health router exposes the agreed API endpoints", () => {
   const router = createHealthRouter({ repository: {}, projectRepository: {}, sessionService: {}, healthProjectCode: "health", uploadDirectory: "/tmp/ai-life-health-test" });
   const paths = router.stack.filter((layer) => layer.route).map((layer) => `${Object.keys(layer.route.methods)[0]} ${layer.route.path}`);
-  assert.deepEqual(paths, ["get /today", "post /hydration", "post /checkins", "post /measurements", "post /events/:eventId/undo", "post /meals", "get /meals", "delete /meals/:id", "get /trends", "get /plan-vs-actual", "get /weekly-report", "get /settings", "patch /settings", "get /notifications", "patch /notifications/:id"]);
+  assert.deepEqual(paths, ["get /today", "post /hydration", "post /checkins", "post /measurements", "post /events/:eventId/undo", "post /meals", "get /meals", "delete /meals/:id", "get /trends", "get /plan-vs-actual", "get /weekly-report", "get /settings", "get /integrations/huawei/status", "post /integrations/huawei/connect", "post /integrations/huawei/sync", "delete /integrations/huawei", "patch /settings", "get /notifications", "patch /notifications/:id"]);
 });
 
 test("trends keep 28-day summary while returning all measurements", async () => {

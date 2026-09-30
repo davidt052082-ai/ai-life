@@ -1,6 +1,29 @@
+function toPlanDate(value, timezone = "UTC") {
+  if (typeof value === "string") {
+    const match = value.match(/^\d{4}-\d{2}-\d{2}/);
+    if (match) return match[0];
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: timezone || "UTC",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .formatToParts(date)
+      .filter(({ type }) => type !== "literal")
+      .map(({ type, value: partValue }) => [type, partValue])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
 function toEvent(row) {
   if (!row) return null;
-  return { id: row.id, eventId: row.event_id, eventType: row.event_type, payload: row.payload, occurredAt: row.occurred_at, timezone: row.timezone, planDate: String(row.plan_date).slice(0, 10), syncStatus: row.sync_status, version: Number(row.version), undoneEventId: row.undone_event_id, createdAt: row.created_at };
+  return { id: row.id, eventId: row.event_id, eventType: row.event_type, payload: row.payload, occurredAt: row.occurred_at, timezone: row.timezone, planDate: toPlanDate(row.plan_date, row.timezone), syncStatus: row.sync_status, version: Number(row.version), undoneEventId: row.undone_event_id, createdAt: row.created_at };
 }
 
 function toMeasurement(row) {
@@ -10,7 +33,7 @@ function toMeasurement(row) {
 
 function toMeal(row) {
   if (!row) return null;
-  return { id: row.id, mealType: row.meal_type, capturedAt: row.captured_at, planDate: String(row.plan_date).slice(0, 10), status: row.status, mimeType: row.mime_type, byteSize: Number(row.byte_size), createdAt: row.created_at };
+  return { id: row.id, mealType: row.meal_type, capturedAt: row.captured_at, timezone: row.timezone, planDate: toPlanDate(row.plan_date, row.timezone), status: row.status, mimeType: row.mime_type, byteSize: Number(row.byte_size), createdAt: row.created_at };
 }
 
 function toSettings(row) {
@@ -118,7 +141,7 @@ export function createHealthRepository(pool) {
         `INSERT INTO health_meals (id, user_id, project_id, idempotency_key, meal_type, storage_key, original_name, mime_type, byte_size, captured_at, timezone, plan_date)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          ON CONFLICT (user_id, idempotency_key) DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
-         RETURNING id, meal_type, captured_at, plan_date, status, mime_type, byte_size, created_at`,
+         RETURNING id, meal_type, captured_at, timezone, plan_date, status, mime_type, byte_size, created_at`,
         [id, userId, projectId, idempotencyKey, mealType, storageKey, originalName, mimeType, byteSize, capturedAt, timezone, planDate]
       );
       return toMeal(result.rows[0]);
@@ -126,7 +149,7 @@ export function createHealthRepository(pool) {
 
     async listMeals({ userId, projectId, startDate, endDate = startDate }) {
       const result = await pool.query(
-        `SELECT id, meal_type, captured_at, plan_date, status, mime_type, byte_size, created_at
+        `SELECT id, meal_type, captured_at, timezone, plan_date, status, mime_type, byte_size, created_at
          FROM health_meals WHERE user_id = $1 AND project_id = $2 AND plan_date BETWEEN $3 AND $4 ORDER BY captured_at ASC`,
         [userId, projectId, startDate, endDate]
       );

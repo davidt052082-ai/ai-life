@@ -78,7 +78,7 @@ async function collectDay(repository, scope, date, settings) {
 
 function responseEvent(event) { return { event, event_id: event.eventId, sync_status: event.syncStatus, server_version: event.version }; }
 
-export function createHealthRouter({ repository, projectRepository = repository, sessionService, healthProjectCode, uploadDirectory }) {
+export function createHealthRouter({ repository, projectRepository = repository, sessionService, healthProjectCode, uploadDirectory, huaweiService = null, huaweiRepository = null }) {
   const router = Router({ mergeParams: true });
   const storage = multer.diskStorage({
     destination: async (_req, _file, callback) => { try { await fs.mkdir(uploadDirectory, { recursive: true }); callback(null, uploadDirectory); } catch (error) { callback(error); } },
@@ -172,10 +172,11 @@ export function createHealthRouter({ repository, projectRepository = repository,
     const endDate = req.query.endDate ? toDate(req.query.endDate) : nowDate(settings.timezone);
     const startDate = req.query.startDate ? toDate(req.query.startDate) : addDays(endDate, -27);
     const fullRange = { ...scope(req), startDate: "1900-01-01", endDate: "2999-12-31" };
-    const [allMeasurements, allEvents, allMeals] = await Promise.all([
+    const [allMeasurements, allEvents, allMeals, huaweiDaily] = await Promise.all([
       repository.listMeasurements({ ...scope(req) }),
       repository.listEvents(fullRange),
-      repository.listMeals(fullRange)
+      repository.listMeals(fullRange),
+      huaweiRepository ? huaweiRepository.getDailyRange({ ...scope(req), startDate, endDate }) : []
     ]);
     const events = inPlanDateRange(allEvents, startDate, endDate);
     const meals = inPlanDateRange(allMeals, startDate, endDate);
@@ -184,7 +185,7 @@ export function createHealthRouter({ repository, projectRepository = repository,
       return date >= startDate && date <= endDate;
     });
     res.set("Cache-Control", "no-store");
-    res.json({ measurements: allMeasurements, history: { events: allEvents, meals: allMeals }, ...buildMetricTrends({ startDate, endDate, measurements, events, meals }) });
+    res.json({ measurements: allMeasurements, history: { events: allEvents, meals: allMeals }, ...buildMetricTrends({ startDate, endDate, measurements, events, meals, huaweiDaily }) });
   }));
 
   async function weekly(req, res, includeOutcome) {
@@ -203,6 +204,22 @@ export function createHealthRouter({ repository, projectRepository = repository,
   router.get("/plan-vs-actual", route((req, res) => weekly(req, res, false)));
   router.get("/weekly-report", route((req, res) => weekly(req, res, true)));
   router.get("/settings", route(async (req, res) => res.json({ settings: await repository.getSettings(scope(req)) })));
+  router.get("/integrations/huawei/status", route(async (req, res) => {
+    res.json(huaweiService ? await huaweiService.status(scope(req)) : { enabled: false, status: "disabled" });
+  }));
+  router.post("/integrations/huawei/connect", route(async (req, res) => {
+    if (!huaweiService) throw Object.assign(new Error("华为健康接入尚未启用。"), { status: 409, code: "HUAWEI_DISABLED" });
+    res.json({ authorizationUrl: await huaweiService.beginConnection(scope(req)) });
+  }));
+  router.post("/integrations/huawei/sync", route(async (req, res) => {
+    if (!huaweiService) throw Object.assign(new Error("华为健康接入尚未启用。"), { status: 409, code: "HUAWEI_DISABLED" });
+    await huaweiService.requestManualSync(scope(req));
+    res.status(202).json({ status: "syncing" });
+  }));
+  router.delete("/integrations/huawei", route(async (req, res) => {
+    if (huaweiService) await huaweiService.disconnect(scope(req));
+    res.status(204).end();
+  }));
   router.patch("/settings", route(async (req, res) => {
     const body = req.body || {}; const current = await repository.getSettings(scope(req));
     const settings = { timezone: typeof body.timezone === "string" ? body.timezone : current.timezone, hydrationTargetMl: body.hydrationTargetMl === undefined ? current.hydrationTargetMl : Number(body.hydrationTargetMl), planDayCutoff: typeof body.planDayCutoff === "string" ? body.planDayCutoff : current.planDayCutoff, abdominalMassageEnabled: body.abdominalMassageEnabled === undefined ? current.abdominalMassageEnabled : Boolean(body.abdominalMassageEnabled) };

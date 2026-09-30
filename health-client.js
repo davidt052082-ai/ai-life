@@ -220,7 +220,8 @@ function trendDescription(metric, options = {}) {
 
 function metricCard(name, metric, options = {}) {
   const empty = metric.status === "empty";
-  const content = empty ? `<div class="metric-name">${escapeHtml(name)}</div><div class="metric-value">0 ${escapeHtml(metric.unit)}</div><p class="metric-empty">${escapeHtml(trendDescription(metric, options))}</p>` : `<div class="metric-name">${escapeHtml(name)}</div><div class="metric-value">${formatMetric(metric.value, metric.unit)}</div><div class="metric-trend">${escapeHtml(trendDescription(metric, options))}</div>${buildTrendSvg(metric.series)}`;
+  const source = metric.source === "huawei" ? `<span class="metric-source">华为运动健康</span>` : metric.source === "manual" ? `<span class="metric-source">手动记录</span>` : "";
+  const content = empty ? `<div class="metric-name">${escapeHtml(name)}</div><div class="metric-value">0 ${escapeHtml(metric.unit)}</div><p class="metric-empty">${escapeHtml(trendDescription(metric, options))}</p>${source}` : `<div class="metric-name">${escapeHtml(name)}</div><div class="metric-value">${formatMetric(metric.value, metric.unit)}</div><div class="metric-trend">${escapeHtml(trendDescription(metric, options))}</div>${buildTrendSvg(metric.series)}${source}`;
   if (options.detailMetric && (metric.status !== "empty" || metric.status === "empty")) return `<button class="metric-card metric-card-button" type="button" data-trend-metric="${options.detailMetric}" aria-label="查看${escapeHtml(name)}变化详情">${content}</button>`;
   return `<article class="metric-card">${content}</article>`;
 }
@@ -271,8 +272,6 @@ function executionPoints(history, metricId) {
   return [...byDate].filter(([, value]) => value !== 0).sort(([left], [right]) => left.localeCompare(right)).map(([date, value]) => ({ date, value }));
 }
 
-function cumulativePoints(points) { let total = 0; return points.map((point) => ({ ...point, cumulative: total += point.value, chartValue: total })); }
-
 function detailTrendSvg(label, range, points, unit) {
   const rangeLabel = range === "28" ? "近 28 天" : "全部";
   const values = points.map((point) => point.chartValue ?? point.value); const minimum = Math.min(...values); const maximum = Math.max(...values); const span = maximum - minimum || 1;
@@ -289,7 +288,7 @@ function renderTrendDetail() {
   if (!config || !state.trends) return;
   const { label, field, unit } = config; const range = state.trendRange; const execution = !bodyConfig;
   const rawPoints = execution ? executionPoints(state.trends.history, state.trendMetric) : measurementPoints(state.trends.measurements, field);
-  const points = execution ? cumulativePoints(filterMeasurementPoints(rawPoints, range, state.trends.endDate)) : filterMeasurementPoints(rawPoints, range, state.trends.endDate);
+  const points = filterMeasurementPoints(rawPoints, range, state.trends.endDate);
   $("#trendDetailTitle").textContent = `${label}变化`;
   document.querySelectorAll("[data-trend-range]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.trendRange === range)));
   if (!points.length) {
@@ -298,7 +297,7 @@ function renderTrendDetail() {
     return;
   }
   $("#trendDetailChart").innerHTML = detailTrendSvg(label, range, points, unit);
-  $("#trendDetailPoints").innerHTML = points.map((point) => `<div class="item"><strong>${escapeHtml(dateLabel(point.date))}</strong> · ${execution ? `当日 ${escapeHtml(formatMetric(point.value, unit))} · 累计 ${escapeHtml(formatMetric(point.cumulative, unit))}` : escapeHtml(formatMetric(point.value, unit))}</div>`).join("");
+  $("#trendDetailPoints").innerHTML = points.map((point) => `<div class="item"><strong>${escapeHtml(dateLabel(point.date))}</strong> · ${execution ? `当日 ${escapeHtml(formatMetric(point.value, unit))}` : escapeHtml(formatMetric(point.value, unit))}</div>`).join("");
 }
 
 function unavailableCard(name, hint, screening = false) {
@@ -321,9 +320,12 @@ function renderMetricTrends(data) {
     metricCard("总饮水量", current.fluid, { detailMetric: "fluid" }), metricCard("无糖茶量", current.tea, { detailMetric: "tea" }), metricCard("餐食照片", current.mealPhotos, { detailMetric: "mealPhotos" }),
     metricCard("无酒天数", current.noAlcohol, { detailMetric: "noAlcohol" }), metricCard("无夜宵天数", current.noLateSnack, { detailMetric: "noLateSnack" }), metricCard("无含糖饮料天数", current.noSugaryDrink, { detailMetric: "noSugaryDrink" })
   ]);
+  const huaweiMetrics = [["步数", current.steps], ["活动消耗", current.activeCalories], ["运动时长", current.exerciseMinutes], ["睡眠时长", current.sleep], ["深睡时长", current.deepSleep], ["静息心率", current.restingHr]];
+  const availableHuawei = huaweiMetrics.filter(([, metric]) => metric.status !== "empty");
+  const huawei = availableHuawei.length ? metricGroup("华为运动健康", "仅展示已授权并成功同步的指标。", availableHuawei.map(([name, metric]) => metricCard(name, metric))) : "";
   const unavailable = metricGroup("待接入指标", "这些指标还没有当前数据源，系统不会以估算值替代。", [
-    unavailableCard("步数", "待手环同步或手动周汇总。"), unavailableCard("睡眠时长", "待手环同步或手动录入。"),
-    unavailableCard("静息心率 / HRV", "待手环自动同步。"), unavailableCard("血压", "需要时通过网页手动录入。"),
+    !availableHuawei.some(([name]) => name === "步数") ? unavailableCard("步数", "连接华为运动健康后同步。") : "", !availableHuawei.some(([name]) => name === "睡眠时长") ? unavailableCard("睡眠时长", "连接华为运动健康后同步。") : "",
+    !availableHuawei.some(([name]) => name === "静息心率") ? unavailableCard("静息心率 / HRV", "连接华为运动健康后同步。") : "", unavailableCard("血压", "需要时通过网页手动录入。"),
     unavailableCard("蛋白质 / 总碳水 / 脂肪", "待接入 AI 食物识别与营养数据库。")
   ]);
   const screening = metricGroup("阶段性体检", "低频体检指标；录入后再显示历史变化。", [
@@ -331,7 +333,15 @@ function renderMetricTrends(data) {
     unavailableCard("TG / HDL-C / LDL-C", "体检抽血后录入。", true), unavailableCard("ALT / AST / GGT", "体检抽血后录入。", true),
     unavailableCard("尿酸", "体检抽血后录入。", true), unavailableCard("肝脏超声", "体检或医疗机构结果录入。", true)
   ]);
-  $("#trendView").innerHTML = `${core}${execution}${unavailable}${screening}`;
+  $("#trendView").innerHTML = `${core}${execution}${huawei}${unavailable}${screening}`;
+}
+
+function renderHuaweiStatus(data) {
+  const status = $("#huaweiHealthStatus"); const connect = $("#connectHuaweiHealth"); const sync = $("#syncHuaweiHealth"); const disconnect = $("#disconnectHuaweiHealth");
+  if (!data.enabled) { status.textContent = "尚未在服务器启用华为运动健康接入。"; connect.disabled = true; sync.disabled = true; disconnect.disabled = true; return; }
+  const labels = { connected: "已连接", reauth_required: "需要重新授权", disconnected: "尚未连接" };
+  status.textContent = `状态：${labels[data.status] || data.status}${data.lastSuccessfulSyncAt ? `；最近同步：${new Date(data.lastSuccessfulSyncAt).toLocaleString("zh-CN")}` : ""}`;
+  connect.disabled = data.status === "connected"; sync.disabled = data.status !== "connected"; disconnect.disabled = data.status === "disconnected";
 }
 
 async function loadTab(tab) {
@@ -340,7 +350,7 @@ async function loadTab(tab) {
   if (tab === "diet") { const data = await request("/meals"); $("#dietView").innerHTML = data.meals.length ? data.meals.map((meal) => `<div class="item">${escapeHtml(meal.mealType)} · 待 AI 分析</div>`).join("") : "暂无照片。"; }
   if (tab === "trends") { renderMetricTrends(await request("/trends", { cache: "no-store" })); }
   if (tab === "compare" || tab === "report") { const data = await request(tab === "compare" ? "/plan-vs-actual" : "/weekly-report"); const container = $(tab === "compare" ? "#compareView" : "#reportView"); container.innerHTML = `<p>本周执行分数：<strong>${data.executionScore}%</strong></p>${data.outcome ? `<p>4 周结果：${escapeHtml(data.outcome.label)}</p>` : ""}<table class="table"><thead><tr><th>项目</th><th>计划</th><th>实际</th><th>完成</th><th>偏差</th></tr></thead><tbody>${data.comparison.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${formatMetric(item.planned, item.unit)}</td><td>${formatMetric(item.actual, item.unit)}</td><td>${item.completionRate ?? "--"}%</td><td>${formatMetric(item.difference, item.unit)}</td></tr>`).join("")}</tbody></table>`; }
-  if (tab === "settings") { const data = await request("/settings"); $("#hydrationTarget").value = data.settings.hydrationTargetMl; $("#cutoff").value = data.settings.planDayCutoff; $("#massageEnabled").checked = data.settings.abdominalMassageEnabled; }
+  if (tab === "settings") { const [data, huawei] = await Promise.all([request("/settings"), request("/integrations/huawei/status")]); $("#hydrationTarget").value = data.settings.hydrationTargetMl; $("#cutoff").value = data.settings.planDayCutoff; $("#massageEnabled").checked = data.settings.abdominalMassageEnabled; renderHuaweiStatus(huawei); }
 }
 
 document.addEventListener("click", async (event) => {
@@ -348,6 +358,9 @@ document.addEventListener("click", async (event) => {
   const tab = event.target.closest("[data-tab]"); if (tab) { document.querySelectorAll(".tab").forEach((item) => item.setAttribute("aria-selected", String(item === tab))); document.querySelectorAll(".panel").forEach((item) => item.classList.toggle("active", item.id === tab.dataset.tab)); try { await loadTab(tab.dataset.tab); } catch (error) { showError(errorMessage(error)); } return; }
   const trendMetric = event.target.closest("[data-trend-metric]"); if (trendMetric) { state.trendMetric = trendMetric.dataset.trendMetric; state.trendRange = "28"; renderTrendDetail(); const dialog = $("#trendDetailDialog"); if (typeof dialog.showModal === "function") dialog.showModal(); else showError("当前浏览器不支持趋势详情窗口。"); return; }
   const trendRange = event.target.closest("[data-trend-range]"); if (trendRange) { state.trendRange = trendRange.dataset.trendRange; renderTrendDetail(); return; }
+  const connectHuawei = event.target.closest("#connectHuaweiHealth"); if (connectHuawei) { try { const data = await request("/integrations/huawei/connect", { method: "POST", body: "{}" }); window.location.assign(data.authorizationUrl); } catch (error) { showError(errorMessage(error)); } return; }
+  const syncHuawei = event.target.closest("#syncHuaweiHealth"); if (syncHuawei) { try { await request("/integrations/huawei/sync", { method: "POST", body: "{}" }); showError("已开始同步，请稍后刷新趋势页。", false); await loadTab("settings"); } catch (error) { showError(errorMessage(error)); } return; }
+  const disconnectHuawei = event.target.closest("#disconnectHuaweiHealth"); if (disconnectHuawei) { try { await request("/integrations/huawei", { method: "DELETE" }); await loadTab("settings"); } catch (error) { showError(errorMessage(error)); } return; }
   const mealAction = event.target.closest("[data-meal-action]"); if (mealAction) { const input = $("#mealPhotoInput"); input.dataset.meal = mealAction.dataset.mealAction; input.click(); return; }
   const measurementAction = event.target.closest("[data-measurement-action]"); if (measurementAction) { const dialog = $("#measurementDialog"); if (typeof dialog.showModal === "function") dialog.showModal(); else showError("当前浏览器不支持身体记录窗口。"); return; }
   const hydration = event.target.closest("[data-hydration], [data-tea]"); if (hydration) { const volume = Number(hydration.dataset.hydration || hydration.dataset.tea); submitAction(hydration, "/hydration", { type: hydration.dataset.tea ? "tea" : "water", volumeMl: volume }, `已记录 +${volume} ml`); return; }
